@@ -13,7 +13,7 @@ ace-pet-vision/
 │  └─ SOURCES.md          # 사진 출처·라이선스
 ├─ models/                # 모델 자동 다운로드 위치
 ├─ outputs/               # 실행 결과 이미지·CSV
-├─ source/                # 프로그램 코드 (기존 구조 유지)
+├─ source/                # 프로그램 코드 3개
 ├─ tests/                 # 코드 변경 후 자동 검증
 ├─ .gitignore             # 대용량·개인 환경 업로드 제외
 ├─ requirements.txt       # 필요한 라이브러리
@@ -88,20 +88,18 @@ data/oxford-iiit-pet/
 
 | 파일 (`source/`) | 역할 |
 |---|---|
-| `main.py` | 입력 선택과 전체 실행 |
-| `config.py` | 폴더 경로·기본 설정값 |
-| `data_loader.py` | 사진 목록·이미지 읽기 |
-| `pet_detector.py` | YOLO로 개·고양이 위치 찾기 |
-| `breed_classifier.py` | 37품종 분류·보류 판정 |
-| `pet_model.py` | 탐지 → 크롭 → 분류 연결 |
-| `model_loader.py` | 모델 다운로드·파일 검증 |
+| `main.py` | 입력·경로 설정·Oxford 정답 비교·전체 실행 |
+| `pet_model.py` | 모델 다운로드·동물 탐지·크롭·품종 분류 |
 | `visualizer.py` | 박스 표시·이미지·CSV 저장 |
-| `oxford_data.py` | Oxford 정답 읽기·결과 비교 |
+
+직접 실행할 파일은 `main.py`입니다. 나머지 두 파일은 메인에서 사용합니다.
+폴더 경로와 처리 장수는 `main.py` 상단에, 모델과 탐지·분류 기준값은 `pet_model.py`에 있습니다.
+기존 파일 9개에 있던 기능을 위 3개로 합쳤으며 실행 옵션과 결과 형식은 유지했습니다.
 
 ## 모델과 자료 출처
 
 - 탐지: [Ultralytics YOLO11n](https://docs.ultralytics.com/models/yolo11/), COCO의 cat(15)·dog(16). [라이선스 안내](https://www.ultralytics.com/license).
-- 품종: [flaviodell/oxford-pets-resnet50](https://huggingface.co/flaviodell/oxford-pets-resnet50), MIT 표기. Oxford 대학의 공식 모델이 아닌 커뮤니티 배포 모델입니다. 고정 버전은 `3253ad292cf0778f5b64fa5a9156f2bdb0a84a3b`이며 다운로드 해시는 `model_loader.py`에 있습니다.
+- 품종: [flaviodell/oxford-pets-resnet50](https://huggingface.co/flaviodell/oxford-pets-resnet50), MIT 표기. Oxford 대학의 공식 모델이 아닌 커뮤니티 배포 모델입니다. 고정 버전은 `3253ad292cf0778f5b64fa5a9156f2bdb0a84a3b`이며 다운로드 해시는 `pet_model.py`에 있습니다.
 - 포함 사진: [출처·라이선스](data/SOURCES.md), [사진별 품종·출처 표](data/metadata.csv).
 
 공식 test 사진과 분류 모델 학습 데이터의 중복 여부는 미확인입니다. 정답 비교표를 독립적인 정확도 검증으로 해석하지 않습니다. 전체 Oxford 사진에 대한 평가는 아직 실행하지 않았습니다.

@@ -1,21 +1,109 @@
-"""통합·실행 담당: 입력 선택 → 탐지·분류 → 결과 저장.
-IntelliJ에서 이 파일을 실행합니다. 예제 사진은 --samples 옵션을 사용하세요.
-설명할 함수: main, process_images. 기본 실행값은 config.py에서 관리합니다.
+"""전체 실행: 입력 선택 → AI 분석 → 결과 저장.
+IntelliJ에서 이 파일을 실행합니다. 포함된 사진 20장은 --samples로 실행하세요.
 """
 import argparse
 from datetime import datetime
 import json
 import logging
 from pathlib import Path
+import re
 import sys
 import time
 
-from config import (INPUT_DIR, DATASET_DIR, MODEL_DIR, OUTPUT_DIR,
-                    DETECTION_CONFIDENCE, BREED_CONFIDENCE, IMAGE_LIMIT)
-from data_loader import project_path, find_images, read_image
+from pet_model import (PetModel, prepare_models, BREED_REVISION, EXPECTED_CLASSES,
+                       DETECTION_CONFIDENCE, BREED_CONFIDENCE)
 from visualizer import annotate, save_image, write_csv, FIELDS, SUMMARY_FIELDS
 
+# 1. 폴더와 실행 설정
+ROOT = Path(__file__).resolve().parents[1]
+INPUT_DIR = ROOT / "data" / "images"
+DATASET_DIR = ROOT / "data" / "oxford-iiit-pet"
+MODEL_DIR = ROOT / "models"
+OUTPUT_DIR = ROOT / "outputs"
+IMAGE_LIMIT = 20
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
 
+# 2. 사진 입력
+def project_path(path):
+    return (path if path.is_absolute() else ROOT / path).resolve()
+
+
+def find_images(folder):
+    if folder.is_file():
+        return [folder] if folder.suffix.lower() in IMAGE_EXTENSIONS else []
+    if not folder.is_dir():
+        raise ValueError(f"입력 폴더가 없습니다: {folder}")
+    return sorted(p for p in folder.rglob("*") if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS)
+
+
+
+def read_image(path):
+    from PIL import Image, ImageOps
+    with Image.open(path) as raw:
+        return ImageOps.exif_transpose(raw).convert("RGB")
+
+# 3. Oxford 정답 읽기와 비교
+def load_split(dataset_dir, split="test", limit=20):
+    dataset_dir = Path(dataset_dir)
+    images = dataset_dir / "images"
+    annotations = dataset_dir / "annotations" / f"{split}.txt"
+    if not images.is_dir() or not annotations.is_file():
+        raise ValueError(
+            f"Oxford 데이터셋이 아직 준비되지 않았습니다.\n"
+            f"images.tar.gz와 annotations.tar.gz를 풀어 다음 위치에 놓으세요:\n"
+            f"  {images}\n  {annotations}\n"
+            "먼저 기존 예제로 확인하려면 실행 옵션에 --samples를 넣으세요."
+        )
+    names = {name.lower().replace(" ", "_"): name for name in EXPECTED_CLASSES}
+    truth, files, seen = {}, [], set()
+    for line_number, line in enumerate(annotations.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        parts = line.split()
+        if len(parts) != 4 or not re.fullmatch(r"[A-Za-z][A-Za-z0-9_]*_[0-9]+", parts[0]):
+            raise ValueError(f"정답 파일 형식 오류: {annotations.name}:{line_number}")
+        image_id, class_id, species, breed_id = parts
+        try:
+            if not (1 <= int(class_id) <= 37 and species in {"1", "2"} and 1 <= int(breed_id) <= 25):
+                raise ValueError()
+        except ValueError:
+            raise ValueError(f"정답 라벨 오류: {annotations.name}:{line_number}") from None
+        breed = names.get(image_id.rsplit("_", 1)[0].lower())
+        if breed is None or image_id in seen:
+            raise ValueError(f"알 수 없거나 중복된 이미지 ID: {image_id}")
+        seen.add(image_id)
+        filename = image_id + ".jpg"
+        files.append(images / filename)
+        truth[filename] = {"breed": breed, "species": "cat" if species == "1" else "dog"}
+    total = len(files)
+    if not total:
+        raise ValueError("데이터셋 정답 파일에 사진 목록이 없습니다.")
+    selected = files[:limit] if limit else files
+    missing = [p.name for p in selected if not p.is_file()]
+    if missing:
+        raise ValueError(f"선택된 데이터셋 사진 {len(missing)}장이 없습니다. 압축 해제 위치를 확인하세요: {missing[:3]}")
+    return images, selected, {p.name: truth[p.name] for p in selected}, total
+
+
+def compare_predictions(truth, results, summary):
+    by_file = {}
+    for row in results:
+        by_file.setdefault(row["filename"], []).append(row)
+    rows = []
+    for image in summary:
+        name = image["filename"]
+        candidates = by_file.get(name, [])
+        # 정답을 보지 않고 가장 큰 탐지 박스를 대표 개체로 선택합니다.
+        selected = max(candidates, key=lambda r: (r["x2"]-r["x1"])*(r["y2"]-r["y1"])) if candidates else None
+        actual = truth[name]
+        matched = bool(selected and selected["breed"] == actual["breed"] and selected["species"] == actual["species"])
+        status = ("error" if image["status"] == "error" else "no_detection") if selected is None else ("match" if matched else "mismatch")
+        rows.append({"filename": name, "expected_species": actual["species"], "expected_breed": actual["breed"],
+                     "predicted_breed": selected["breed"] if selected else "", "comparison": status,
+                     "animal_count": len(candidates), "multiple_animals_review": len(candidates) > 1})
+    return rows
+
+# 4. 전체 실행
 def process_images(files, input_root, run_dir, model):
     all_rows, summary = [], []
     for index, path in enumerate(files, 1):
@@ -71,7 +159,7 @@ def main(argv=None):
     mode.add_argument("--samples", action="store_true", help="data/images의 기존 예제 사진 사용")
     parser.add_argument("--dataset", type=Path, default=DATASET_DIR)
     parser.add_argument("--split", choices=["test", "trainval"], default="test")
-    parser.add_argument("--limit", type=int, default=IMAGE_LIMIT, help="처음 처리할 사진 수. 0이면 전체; 기본값은 config.py 참조")
+    parser.add_argument("--limit", type=int, default=IMAGE_LIMIT, help="처음 처리할 사진 수. 0이면 전체; 기본값은 main.py 상단 참조")
     parser.add_argument("--output", type=Path, default=OUTPUT_DIR)
     parser.add_argument("--conf", type=probability, default=DETECTION_CONFIDENCE, help="동물 탐지 임계값")
     parser.add_argument("--breed-conf", type=probability, default=BREED_CONFIDENCE, help="품종 후보 보류 임계값")
@@ -79,7 +167,6 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.limit < 0:
         parser.error("--limit는 0 이상이어야 합니다.")
-    from pet_model import PetModel, prepare_models, BREED_REVISION
     if args.prepare_models:
         prepare_models(MODEL_DIR)
         print("모델 준비 완료. Oxford 데이터셋으로 실행하거나 --samples로 기존 예제를 실행하세요.")
@@ -94,7 +181,6 @@ def main(argv=None):
             files = files[:args.limit]
         source_mode = "samples" if args.samples else "custom"
     else:
-        from oxford_data import load_split
         source, files, truth, total = load_split(project_path(args.dataset), args.split, args.limit)
         source_mode = "oxford"
     if not files:
@@ -118,7 +204,6 @@ def main(argv=None):
         model = PetModel(MODEL_DIR, args.conf, args.breed_conf)
         rows, summary = process_images(files, input_root, run_dir, model)
         if truth is not None:
-            from oxford_data import compare_predictions
             comparisons = compare_predictions(truth, rows, summary)
             write_csv(run_dir / "dataset_comparison.csv", comparisons, list(comparisons[0]))
             config["label_matches"] = sum(row["comparison"] == "match" for row in comparisons)

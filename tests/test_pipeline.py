@@ -8,10 +8,8 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "source"))
-from breed_classifier import choose_breed
-from model_loader import download_verified
-from oxford_data import load_split, compare_predictions
-from main import process_images
+from pet_model import choose_breed, download_verified
+from main import load_split, compare_predictions, process_images
 
 
 class PipelineTests(unittest.TestCase):
@@ -25,10 +23,10 @@ class PipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "weights.pth"
             path.write_bytes(b"original")
-            with patch("model_loader.urllib.request.urlopen") as download:
+            with patch("pet_model.urllib.request.urlopen") as download:
                 download_verified("https://example.com/model", path, hashlib.sha256(b"original").hexdigest())
                 download.assert_not_called()
-            with patch("model_loader.urllib.request.urlopen", return_value=io.BytesIO(b"bad")):
+            with patch("pet_model.urllib.request.urlopen", return_value=io.BytesIO(b"bad")):
                 with self.assertRaises(RuntimeError):
                     download_verified("https://example.com/model", path, "0" * 64)
             self.assertEqual(path.read_bytes(), b"original")
