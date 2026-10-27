@@ -1,0 +1,218 @@
+{
+  "date": "2026-10-27",
+  "new_photos": [
+    {
+      "filename": "abyssinian.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Cinnamon42-300.jpg",
+      "license_evidence_url": "https://commons.wikimedia.org/wiki/File:Cinnamon42-300.jpg#Licensing",
+      "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/63/Cinnamon42-300.jpg/960px-Cinnamon42-300.jpg",
+      "visual_review": "opened and inspected; one animal; no visible person or watermark",
+      "quality_note": "입력 확인용 후보로 채택.",
+      "modifications": "Wikimedia 960px thumbnail; no local edits",
+      "sha256": "3bd567db9a9f97c30b650bef5b6be055bdd768549c97ed89e31daba78e0f96a8"
+    },
+    {
+      "filename": "birman.png",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Birman_Cat.png",
+      "license_evidence_url": "https://commons.wikimedia.org/wiki/File:Birman_Cat.png#Licensing",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/a/a5/Birman_Cat.png",
+      "visual_review": "opened and inspected; one animal; no visible person or watermark",
+      "quality_note": "입력 확인용 후보로 채택.",
+      "modifications": "none; original bytes",
+      "sha256": "d0e6371c64f62ac9ce0ab90046c57cae68d0e6686660d333723f1be12c4e9fbb"
+    },
+    {
+      "filename": "maine_coon.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Alfred_the_Maine_Coon.jpg",
+      "license_evidence_url": "https://commons.wikimedia.org/wiki/File:Alfred_the_Maine_Coon.jpg#Licensing",
+      "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1f/Alfred_the_Maine_Coon.jpg/960px-Alfred_the_Maine_Coon.jpg",
+      "visual_review": "opened and inspected; one animal; no visible person or watermark",
+      "quality_note": "측면 얼굴 촬영.",
+      "modifications": "Wikimedia 960px thumbnail; no local edits",
+      "sha256": "432a102b64616e299d875c586938d0b96193716ca8869adddc117e90cf64760f"
+    },
+    {
+      "filename": "ragdoll.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Ragdoll_Cat_Face.jpg",
+      "license_evidence_url": "https://commons.wikimedia.org/wiki/File:Ragdoll_Cat_Face.jpg#Licensing",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/d/da/Ragdoll_Cat_Face.jpg",
+      "visual_review": "opened and inspected; one animal; no visible person or watermark",
+      "quality_note": "얼굴 근접 촬영, 부드러운 초점.",
+      "modifications": "none; original bytes",
+      "sha256": "a30d1d1bdd27cea279a99de5265bddc74196759de9ea7bd84f7cee5ade121e38"
+    },
+    {
+      "filename": "russian_blue.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Russian_Blue.jpg",
+      "license_evidence_url": "https://commons.wikimedia.org/wiki/File:Russian_Blue.jpg#Licensing",
+      "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6f/Russian_Blue.jpg/500px-Russian_Blue.jpg",
+      "visual_review": "opened and inspected; one animal; no visible person or watermark",
+      "quality_note": "입력 확인용 후보로 채택.",
+      "modifications": "Wikimedia 500px thumbnail; no local edits",
+      "sha256": "466b138b3d0f5b4e2e19112b08cc46262182837087a8b8c798e6d6635788f602"
+    },
+    {
+      "filename": "british_shorthair.png",
+      "source_page": "https://commons.wikimedia.org/wiki/File:British-shorthair.png",
+      "license_evidence_url": "https://commons.wikimedia.org/wiki/File:British-shorthair.png#Licensing",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/e/e6/British-shorthair.png",
+      "visual_review": "opened and inspected; one animal; no visible person or watermark",
+      "quality_note": "흑백 사진.",
+      "modifications": "none; original bytes",
+      "sha256": "f320277ebadf66e6f71c62918a94307db776021c911ff220dcd479e85b454557"
+    },
+    {
+      "filename": "bengal.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Bengal_Cat.jpg",
+      "license_evidence_url": "https://commons.wikimedia.org/wiki/File:Bengal_Cat.jpg#Licensing",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/1/19/Bengal_Cat.jpg",
+      "visual_review": "opened and inspected; one animal; no visible person or watermark",
+      "quality_note": "입력 확인용 후보로 채택.",
+      "modifications": "none; original bytes",
+      "sha256": "1eb37d98aa45f7ee9a6fd7287038a4753b4f8b7e57b79ee14c460c1893589868"
+    },
+    {
+      "filename": "sphynx.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Sphynx.jpg",
+      "license_evidence_url": "https://commons.wikimedia.org/wiki/File:Sphynx.jpg#Licensing",
+      "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b6/Sphynx.jpg/500px-Sphynx.jpg",
+      "visual_review": "opened and inspected; one animal; no visible person or watermark",
+      "quality_note": "얼굴이 아래를 향하는 전신 자세.",
+      "modifications": "Wikimedia 500px thumbnail; no local edits",
+      "sha256": "22c857dd8de1b56082ff63170913221f0fd2749019e3b051b870f59f51653d91"
+    },
+    {
+      "filename": "basset_hound.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Beautiful_basset-hound.jpg",
+      "license_evidence_url": "https://commons.wikimedia.org/wiki/File:Beautiful_basset-hound.jpg#Licensing",
+      "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/38/Beautiful_basset-hound.jpg/500px-Beautiful_basset-hound.jpg",
+      "visual_review": "opened and inspected; one animal; no visible person or watermark",
+      "quality_note": "저해상도 축소본이지만 한 마리 식별 가능.",
+      "modifications": "Wikimedia 500px thumbnail; no local edits",
+      "sha256": "4f04bbb4ec4828546a7db1c2745c610e48ef92cd7fb23c6f87df050a6303e0ab"
+    },
+    {
+      "filename": "boxer.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Boxer_Dog.jpg",
+      "license_evidence_url": "https://commons.wikimedia.org/wiki/File:Boxer_Dog.jpg#Licensing",
+      "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/82/Boxer_Dog.jpg/960px-Boxer_Dog.jpg",
+      "visual_review": "opened and inspected; one animal; no visible person or watermark",
+      "quality_note": "입력 확인용 후보로 채택.",
+      "modifications": "Wikimedia 960px thumbnail; no local edits",
+      "sha256": "00820413a5d8ba9513092757277274757ffe065f33be96de53580de4f3541d92"
+    },
+    {
+      "filename": "pomeranian.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Pomeranian.JPG",
+      "license_evidence_url": "https://commons.wikimedia.org/wiki/File:Pomeranian.JPG#Licensing",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/c/ca/Pomeranian.JPG",
+      "visual_review": "opened and inspected; one animal; no visible person or watermark",
+      "quality_note": "입력 확인용 후보로 채택.",
+      "modifications": "none; original bytes",
+      "sha256": "4b44f637fcb83e44ce8263709597fc31c859edee5d2217b33e24199ba5f3c853"
+    },
+    {
+      "filename": "shiba_inu.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Shiba_Inu.jpg",
+      "license_evidence_url": "https://commons.wikimedia.org/wiki/File:Shiba_Inu.jpg#Licensing",
+      "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/20/Shiba_Inu.jpg/500px-Shiba_Inu.jpg",
+      "visual_review": "opened and inspected; one animal; no visible person or watermark",
+      "quality_note": "입력 확인용 후보로 채택.",
+      "modifications": "Wikimedia 500px thumbnail; no local edits",
+      "sha256": "b5e221ced5fda4cb918ef5aa858af04e8a8df98d8a0f0b988f85cad50c003bf3"
+    },
+    {
+      "filename": "yorkshire_terrier.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Yorkshire_terrier.JPG",
+      "license_evidence_url": "https://commons.wikimedia.org/wiki/File:Yorkshire_terrier.JPG#Licensing",
+      "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3e/Yorkshire_terrier.JPG/500px-Yorkshire_terrier.JPG",
+      "visual_review": "opened and inspected; one animal; no visible person or watermark",
+      "quality_note": "입력 확인용 후보로 채택.",
+      "modifications": "Wikimedia 500px thumbnail; no local edits",
+      "sha256": "3d6a1a2c04538277714035e4b9644a893f1d17c62d8c9c97cae95fea828d0840"
+    },
+    {
+      "filename": "samoyed.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:BeachDog2.jpg",
+      "license_evidence_url": "https://commons.wikimedia.org/wiki/File:BeachDog2.jpg#Licensing",
+      "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a8/BeachDog2.jpg/500px-BeachDog2.jpg",
+      "visual_review": "opened and inspected; one animal; no visible person or watermark",
+      "quality_note": "하체가 통나무에 가려짐.",
+      "modifications": "Wikimedia 500px thumbnail; no local edits",
+      "sha256": "a0385845a97ed8bdf4f55170aa8e3478a817cfd1b676676bb04d487d04bf7691"
+    },
+    {
+      "filename": "chihuahua.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:Black_Chihuahua_LANA.jpg",
+      "license_evidence_url": "https://commons.wikimedia.org/wiki/File:Black_Chihuahua_LANA.jpg#Licensing",
+      "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a1/Black_Chihuahua_LANA.jpg/500px-Black_Chihuahua_LANA.jpg",
+      "visual_review": "opened and inspected; one animal; no visible person or watermark",
+      "quality_note": "가로로 긴 근접 촬영. 축소본 500x231.",
+      "modifications": "Wikimedia 500px thumbnail; no local edits",
+      "sha256": "d783aeae312ff86541b7a04acf45630a419c7d7f30b22b40e8de5660361fedb0"
+    },
+    {
+      "filename": "english_setter.jpg",
+      "source_page": "https://commons.wikimedia.org/wiki/File:English_Setter_head.jpg",
+      "license_evidence_url": "https://commons.wikimedia.org/wiki/File:English_Setter_head.jpg#Licensing",
+      "download_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/21/English_Setter_head.jpg/500px-English_Setter_head.jpg",
+      "visual_review": "opened and inspected; one animal; no visible person or watermark",
+      "quality_note": "입력 확인용 후보로 채택.",
+      "modifications": "Wikimedia 500px thumbnail; no local edits",
+      "sha256": "62ee17dfd4c9bf7c60ea58c91f5c742e22821a809e988853810ff161c605f80c"
+    }
+  ],
+  "existing_photos": {
+    "siamese.jpg": {
+      "hash_matches_prior_record": true,
+      "visual_review": "opened and inspected",
+      "quality_note": ""
+    },
+    "persian.jpg": {
+      "hash_matches_prior_record": true,
+      "visual_review": "opened and inspected",
+      "quality_note": "기존 사진. 다소 흐림. 입력 확인용으로 유지."
+    },
+    "beagle.jpg": {
+      "hash_matches_prior_record": true,
+      "visual_review": "opened and inspected",
+      "quality_note": ""
+    },
+    "pug.jpg": {
+      "hash_matches_prior_record": true,
+      "visual_review": "opened and inspected",
+      "quality_note": ""
+    },
+    "golden_retriever.jpg": {
+      "hash_matches_prior_record": true,
+      "visual_review": "opened and inspected",
+      "quality_note": ""
+    }
+  },
+  "rejected": [
+    {
+      "title": "Gatto Maine Coon.jpg",
+      "reason": "사람 얼굴과 손이 보임"
+    },
+    {
+      "title": "Basset-hound.jpg",
+      "reason": "뒤에 다른 개가 겹침"
+    },
+    {
+      "title": "Saint Bernard.png",
+      "reason": "촬영 경위 및 비생성 사진 여부를 충분히 확인하지 못해 제외. AI 생성물로 확정한 것은 아님."
+    },
+    {
+      "title": "Saint-bernard-musee.JPG",
+      "reason": "여러 사람이 보임"
+    },
+    {
+      "title": "Chihuahua 2.jpg",
+      "reason": "본문의 품종 근거가 부족해 품종을 명시한 다른 사진으로 교체"
+    },
+    {
+      "title": "Poktori-1.JPG",
+      "reason": "본문 설명 누락으로 더 명확한 개체 출처가 있는 사진으로 교체"
+    }
+  ]
+}

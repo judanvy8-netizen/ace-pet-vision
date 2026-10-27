@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-27",
+  "baseline_commit": "07ffb6ce73b308cb6496b60f7bffe638e4de2bc2",
+  "supported_photo_count": 20,
+  "cat_count": 10,
+  "dog_count": 10,
+  "distinct_labels": 20,
+  "added_photos": 16,
+  "excluded_preserved": 1,
+  "decoded_images": 20,
+  "sha256_matches": 20,
+  "duplicate_sha256": 0,
+  "dhash_candidates_distance_le_6": [],
+  "visual_review_completed": 20,
+  "source_pages_read": 20,
+  "original_links": "Resolved from file pages / imageinfo; not all original binary downloads succeeded (429). Delivered download URLs succeeded.",
+  "model_inference": "NOT RUN",
+  "training_overlap": "NOT CHECKED",
+  "native_original_downloads": 9,
+  "thumbnail_downloads": 11
+}
