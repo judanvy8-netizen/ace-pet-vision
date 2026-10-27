@@ -1,118 +1,110 @@
-# ACE — 반려동물 탐지·품종 분류
+# ACE — 개·고양이 수와 품종 분석
 
-사진에서 개·고양이를 찾아 품종 후보를 표시하고 결과 이미지와 CSV를 저장합니다. Python 3.11을 사용합니다.
+**`source/main.py`를 실행하면 `data/images`의 모든 사진을 분석합니다.**
+Oxford 원본 사진이나 정답 파일을 다운로드할 필요가 없습니다. 이미 학습된 모델 두 개를 사용합니다.
 
-## 폴더와 파일
+## 폴더 구조
 
 ```text
 ace-pet-vision/
 ├─ data/
-│  ├─ images/             # 포함된 사진 20장
-│  ├─ oxford-iiit-pet/    # 수업 데이터셋 (Git 제외)
-│  ├─ metadata.csv        # 사진별 품종·출처 정보
-│  └─ SOURCES.md          # 사진 출처·라이선스
-├─ models/                # 모델 자동 다운로드 위치
-├─ outputs/               # 실행 결과 이미지·CSV
-├─ source/                # 프로그램 코드 3개
-├─ tests/                 # 코드 변경 후 자동 검증
-├─ .gitignore             # 대용량·개인 환경 업로드 제외
-├─ requirements.txt       # 필요한 라이브러리
-├─ setup.bat              # 처음 환경 설치
-├─ setup_env.py           # setup.bat이 사용하는 설치 코드
-├─ run.bat                # 프로그램 실행
-└─ README.md              # 이 안내서
+│  ├─ images/         # 분석할 사진 (현재 20장)
+│  ├─ metadata.csv    # 포함된 사진의 품종·출처 정보
+│  └─ SOURCES.md      # 사진 출처·라이선스
+├─ models/            # 모델 자동 다운로드 위치
+├─ outputs/           # 결과 사진·CSV
+├─ source/
+│  ├─ main.py         # 사진 읽기·전체 실행·마릿수 출력
+│  ├─ pet_model.py    # 모델 준비·동물 탐지·품종 분류
+│  └─ visualizer.py   # 마릿수·박스·품종 표시, 결과 저장
+├─ tests/             # 코드 변경 후 자동 검증
+├─ requirements.txt
+├─ setup.bat
+├─ setup_env.py
+├─ run.bat
+├─ .gitignore
+└─ README.md
 ```
 
-`data/images/`의 이름은 **번호_종류_품종**입니다.
-예: `01_cat_abyssinian.jpg`, `02_dog_basset_hound.jpg`, `03_dog_beagle.jpg`.
-`cat`은 고양이, `dog`는 개입니다. 번호는 정렬용이며 품종 클래스 번호가 아닙니다. 파일명은 참고 라벨이고 AI는 사진을 보고 품종을 추론합니다.
+사진 이름은 `01_cat_abyssinian.jpg`, `02_dog_basset_hound.jpg`처럼 번호·종류·품종 순서입니다. `cat`은 고양이, `dog`는 개입니다.
+파일명은 참고 정보이며 프로그램은 사진을 보고 판단합니다.
 
 ## 처음 한 번 설치
 
 1. 64비트 Python 3.11을 설치합니다.
-2. 프로젝트 폴더에서 `setup.bat`을 실행합니다. `Environment ready.`가 나오면 설치 완료입니다.
-3. IntelliJ의 Python SDK를 프로젝트 안의 `.venv\Scripts\python.exe`로 선택합니다.
-4. `No Python interpreter` 경고가 남으면 **Project Structure → Modules → Dependencies → Module SDK**에도 그 환경을 선택하고 Apply를 누릅니다.
+2. 프로젝트 폴더에서 `setup.bat`을 실행합니다. `Environment ready.`가 나오면 완료입니다.
+3. IntelliJ의 Python SDK로 프로젝트 안의 `.venv\Scripts\python.exe`를 선택합니다.
+4. 인터프리터 경고가 남으면 **Project Structure → Modules → Dependencies → Module SDK**에도 같은 환경을 선택합니다.
 
-SDK 목록에 없다면 **Project Structure → SDKs → + → Python SDK → 기존 환경**에서 등록합니다. 메뉴 이름은 IntelliJ 버전에 따라 다를 수 있습니다.
-Git Pull만으로 설치되지는 않습니다. `.venv`는 각 PC에서 만들며, 설치와 IntelliJ 연결은 별개입니다. 이미 설치했다면 다시 만들 필요가 없습니다.
+SDK 목록에 없다면 **Project Structure → SDKs → + → Python SDK → 기존 환경**에서 등록합니다. 메뉴 이름은 버전에 따라 다를 수 있습니다.
+기존 가상환경과 모델 파일이 있으면 재사용합니다.
 
 ## 실행
 
-IntelliJ 아래 터미널에서 프로젝트 폴더를 기준으로 실행합니다.
+**IntelliJ에서 `source/main.py`를 우클릭 → Run 'main'. 별도 실행 옵션은 필요 없습니다.**
+
+또는 프로젝트 터미널에서:
 
 ```powershell
-# 포함된 사진 20장
-.\run.bat --samples
-
-# 수업용 Oxford 데이터셋: 처음 20장
 .\run.bat
-
-# 사진 한 장
-.\run.bat --input data/images/03_dog_beagle.jpg
 ```
 
-`source/main.py`를 IntelliJ에서 실행해도 됩니다. 기본 입력은 Oxford 데이터셋이며, 포함된 사진을 쓰려면 실행 옵션에 `--samples`를 넣습니다.
-모델은 첫 실행 때 자동으로 다운로드합니다. 추가 학습은 하지 않습니다.
+사진을 추가하려면 `data/images`에 JPG·PNG 등을 넣고 다시 실행하세요. 첫 실행에는 학습된 모델 파일만 자동 다운로드합니다.
+이전 명령 `.\run.bat --samples`도 같은 사진 폴더를 처리합니다.
 
-## Oxford 데이터셋 넣기
+## 무엇이 표시되나요?
 
-[공식 페이지](https://www.robots.ox.ac.uk/~vgg/data/pets/)의 `images.tar.gz`, `annotations.tar.gz`를 받아 아래처럼 압축을 풉니다.
+터미널 표시 형식:
 
 ```text
-data/oxford-iiit-pet/
-├─ images/       # Abyssinian_201.jpg 등 원본 사진
-└─ annotations/  # test.txt, trainval.txt 등 정답 목록
+[1/20] 03_dog_beagle.jpg: 개 1마리 / 고양이 0마리
+  1. 개: Beagle / 후보 점수 53.3%
 ```
 
-이미 받은 파일은 다시 받지 않아도 됩니다. **Oxford 원본 이름은 정답 목록과 연결되므로 변경하지 않습니다.**
-대용량 데이터셋은 자동으로 다운로드하지 않습니다. GitHub에서 `.gitkeep`만 보이는 것은 빈 폴더를 유지하기 위한 정상 상태입니다.
+- 결과 사진 위쪽: `Dogs: 1 | Cats: 0`처럼 검출된 개·고양이 수.
+- 동물마다: 네모 박스, 번호, 개/고양이 종류, 품종 후보와 점수.
+- 품종 점수가 낮거나 동물 종류가 불일치하면: `review`로 표시하고 후보만 제공합니다.
+- 동물을 찾지 못한 사진: 개·고양이 모두 0마리.
+- 사진을 읽거나 처리하지 못한 경우: 오류로 기록하며 미탐과 구분합니다.
 
-## 결과 보기
+**마릿수는 모델이 검출한 수라서 중복 탐지·미탐이 있을 수 있습니다. 품종 점수도 실제 정답률을 뜻하지 않습니다.**
+모델은 37품종 후보를 지원하며, 다른 품종이나 믹스견·믹스묘도 잘못 분류할 수 있습니다.
 
-실행할 때마다 `outputs/run_날짜_시간/`이 생성됩니다.
+## 저장 위치
 
-| 결과 | 내용 |
+실행마다 `outputs/run_날짜_시간/`에 저장합니다.
+
+| 항목 | 내용 |
 |---|---|
-| `images/` | 박스·품종이 표시된 사진 |
-| `crops/` | 동물 부분만 자른 사진 |
-| `results.csv` | 동물별 예측 품종·후보 점수 |
-| `image_summary.csv` | 사진별 검출 수·처리 상태 |
-| `dataset_comparison.csv` | Oxford 모드에서 정답과 비교 |
+| `images/` | 마릿수·박스·품종이 표시된 결과 사진 |
+| `crops/` | 동물별로 잘라낸 사진 |
+| `results.csv` | 동물 한 마리당 한 행: 종류·품종·후보 점수 |
+| `image_summary.csv` | 사진별 `dog_count`·`cat_count`·처리 상태 |
 | `run_config.json`, `errors.log` | 실행 설정과 오류 기록 |
 
-`ok`는 처리가 끝났다는 뜻이며 정답을 보장하지 않습니다. `no_detection`은 동물을 찾지 못한 경우입니다.
-품종 점수가 낮거나 탐지·분류의 동물 종류가 다르면 `unknown/review`로 표시합니다. 후보 점수는 실제 정확도가 아닙니다.
+원본 사진은 수정하지 않습니다. 결과 사진에는 위쪽 요약 여백을 추가하며 CSV의 박스 좌표는 EXIF 회전을 반영한 원본 사진 기준입니다.
+예전 실행 결과는 그대로 남으므로 새로 생성된 폴더를 확인하세요.
 
-## 코드 역할
-
-| 파일 (`source/`) | 역할 |
-|---|---|
-| `main.py` | 입력·경로 설정·Oxford 정답 비교·전체 실행 |
-| `pet_model.py` | 모델 다운로드·동물 탐지·크롭·품종 분류 |
-| `visualizer.py` | 박스 표시·이미지·CSV 저장 |
-
-직접 실행할 파일은 `main.py`입니다. 나머지 두 파일은 메인에서 사용합니다.
-폴더 경로와 처리 장수는 `main.py` 상단에, 모델과 탐지·분류 기준값은 `pet_model.py`에 있습니다.
-기존 파일 9개에 있던 기능을 위 3개로 합쳤으며 실행 옵션과 결과 형식은 유지했습니다.
-
-## 모델과 자료 출처
-
-- 탐지: [Ultralytics YOLO11n](https://docs.ultralytics.com/models/yolo11/), COCO의 cat(15)·dog(16). [라이선스 안내](https://www.ultralytics.com/license).
-- 품종: [flaviodell/oxford-pets-resnet50](https://huggingface.co/flaviodell/oxford-pets-resnet50), MIT 표기. Oxford 대학의 공식 모델이 아닌 커뮤니티 배포 모델입니다. 고정 버전은 `3253ad292cf0778f5b64fa5a9156f2bdb0a84a3b`이며 다운로드 해시는 `pet_model.py`에 있습니다.
-- 포함 사진: [출처·라이선스](data/SOURCES.md), [사진별 품종·출처 표](data/metadata.csv).
-
-공식 test 사진과 분류 모델 학습 데이터의 중복 여부는 미확인입니다. 정답 비교표를 독립적인 정확도 검증으로 해석하지 않습니다. 전체 Oxford 사진에 대한 평가는 아직 실행하지 않았습니다.
-
-## 공유와 업데이트
-
-코드·사진 20장·출처 기록은 GitHub에 올립니다. 실제 Oxford 데이터, 모델, 실행 결과, `.venv`, `.idea`는 제외합니다.
-개인 사진은 Git에서 제외되는 `data/my-photos/`에 보관하고 `--input data/my-photos`로 실행할 수 있습니다.
-예전 `datasets/oxford-iiit-pet`에 받은 자료는 `data/oxford-iiit-pet`으로 옮기세요. 이전 `output/` 결과는 그대로 남고 새 결과는 `outputs/`에 저장됩니다.
-사진 이름 변경 전의 실행 결과도 그대로 남습니다. 다시 실행하면 새 이름으로 저장됩니다.
-
-코드를 바꾼 뒤 검증하려면 다음을 실행합니다.
+## 선택 사항
 
 ```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+# 사진 한 장만 분석
+.\run.bat --input data/images/03_dog_beagle.jpg
+
+# 처음 5장만 분석 (기본값 0 = 전체)
+.\run.bat --limit 5
 ```
+
+실행 흐름은 `main.py → pet_model.py → visualizer.py`입니다.
+사진·결과 경로는 `main.py` 상단에, 모델의 탐지·분류 기준은 `pet_model.py`에 있습니다.
+
+## 모델·사진 출처
+
+- 탐지: [Ultralytics YOLO11n](https://docs.ultralytics.com/models/yolo11/) — cat(15), dog(16). [라이선스](https://www.ultralytics.com/license).
+- 품종: [flaviodell/oxford-pets-resnet50](https://huggingface.co/flaviodell/oxford-pets-resnet50) — Oxford 데이터로 학습된 커뮤니티 모델, MIT 표기. 학습에 사용된 사진을 직접 받을 필요는 없습니다. 다운로드 버전·해시는 `pet_model.py`에 고정되어 있습니다.
+- 포함 사진: [출처·라이선스](data/SOURCES.md), [품종·출처 표](data/metadata.csv).
+
+모델·결과·가상환경은 Git에서 제외합니다. 개인 사진은 Git에서 제외되는 `data/my-photos/`에 두고 `--input data/my-photos`로 실행할 수 있습니다.
+과거에 내려받은 Oxford 자료는 사용하지 않습니다. 이미 있는 로컬 자료는 자동 삭제하지 않습니다.
+
+코드 변경 후 검증: `.venv\Scripts\python.exe -m unittest discover -s tests -v`.

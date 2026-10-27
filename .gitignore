@@ -9,7 +9,6 @@ __pycache__/
 
 # Large datasets and personal photos
 data/oxford-iiit-pet/*
-!data/oxford-iiit-pet/.gitkeep
 data/my-photos/
 images.tar.gz
 annotations.tar.gz
