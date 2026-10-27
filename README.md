@@ -1,27 +1,73 @@
-# ACE 반려동물 사진기 + 품종 분류
+# ACE — 반려동물 사진기 및 품종 분류
 
-고등학교 컴퓨터 비전 팀 프로젝트입니다. 사진 파일을 입력하면 지원하는 개·고양이 품종 후보를 화면에 보여주고, 결과를 CSV 또는 이미지로 저장하는 프로그램을 목표로 합니다. 카메라 촬영은 요구사항 확인 후 연결합니다.
+사진을 입력해 개·고양이를 탐지하고, 품종 후보와 결과 이미지·CSV를 제공하는 고등학교 팀 프로젝트입니다.
 
-## Python 3.11 환경 자동 설정
+## 1. 개발 환경
 
-Windows에서 Python 3.11(64비트)을 설치한 뒤, 이 저장소를 내려받고 **`setup.bat`을 한 번 실행**하세요. 프로젝트의 `.venv` 생성 → CPU용 라이브러리 설치 → 설치 확인을 자동으로 진행합니다.
+- IDE: IntelliJ IDEA (Python 플러그인)
+- 운영체제: Windows
+- Python: **3.11, 64비트**
+- 가상환경: 프로젝트 내부 `.venv`
+- 주요 라이브러리: PyTorch, torchvision, Ultralytics YOLO, OpenCV, NumPy, pandas, Pillow
+- 버전 목록: [requirements.txt](requirements.txt)
 
-완료 후 IntelliJ의 Python SDK로 **`.venv\\Scripts\\python.exe`**를 선택하면 됩니다. 가상환경 자체는 GitHub에 올리지 않으며, 팀원마다 스크립트로 생성합니다. GitHub에서 Clone/Pull하는 것만으로 설치가 자동 실행되지는 않습니다.
+## 2. 프로젝트 폴더 구조
 
-자세한 메뉴와 재실행 방법: **[SETUP.md](SETUP.md)**
+```text
+ace-pet-vision/
+├─ .idea/                 # IntelliJ가 로컬에서 생성, Git 제외
+├─ .venv/                 # setup.bat으로 로컬에서 생성, Git 제외
+├─ input/                 # 입력 사진
+│  ├─ images/             # 기본 입력 대상: 준비된 사진 20장
+│  └─ out-of-scope/       # 지원 범위 밖 사진, 기본 입력에서 제외
+├─ output/                # 처리 결과 이미지·CSV 저장 위치
+├─ source/                # Python 프로그램 코드
+│  └─ main.py            # 시작 파일: 현재 입력 사진 목록 확인
+├─ models/                # 사전 학습 모델 저장 위치
+├─ data/                  # 출처·품종 표, 검토 기록, 향후 정답표
+│  ├─ smoke-test/
+│  └─ out-of-scope/
+├─ .gitignore
+├─ requirements.txt
+├─ setup.bat              # Windows 자동 환경 설정
+├─ setup_env.py
+├─ SETUP.md
+└─ README.md
+```
+
+`input → source에서 처리 → output` 순서로 사용합니다. `models`에는 모델을, `data`에는 출처와 정답 정보를 둡니다. `output`과 `models`는 폴더 유지용 .gitkeep만 공유하고 실제 생성 결과·모델은 Git에서 제외합니다. `.idea`, `.venv`, `*.iml`은 각 컴퓨터의 설정이므로 GitHub에 올리지 않습니다.
+
+## 3. 처음 실행하기
+
+1. Python 3.11(64비트)을 설치하고 저장소를 내려받습니다.
+2. 프로젝트 루트의 **setup.bat**을 실행합니다. 가상환경 생성과 CPU용 라이브러리 설치를 진행합니다.
+3. 완료 후 IntelliJ에서 프로젝트 SDK로 **`.venv\\Scripts\\python.exe`**를 선택합니다.
+4. **source/main.py**를 우클릭하고 **Run 'main'**을 누릅니다.
+5. 준비된 입력 사진 20장의 목록이 출력되는지 확인합니다.
+
+현재 main.py는 프로젝트 경로와 입력 목록을 확인하는 시작 파일입니다. **동물 탐지·품종 추론·결과 저장 기능은 아직 구현하지 않았습니다.** 현재 상태와 모델 검증 범위를 아래에 구분해 기록했습니다.
+
+IntelliJ 하단 PowerShell Terminal에서 실행할 수도 있습니다.
+
+```powershell
+.\setup.bat
+.\.venv\Scripts\python.exe source\main.py
+```
+
+상세 설정: [SETUP.md](SETUP.md). Clone/Pull만으로 설치가 자동 실행되지는 않습니다. 이미 설정했다면 setup.bat은 기존 .venv를 재사용합니다.
 
 ## 현재 상태
 
 - 사진 입력·추론 흐름을 확인할 후보 사진 20장을 준비했습니다. 고양이 10장, 개 10장으로 서로 다른 20품종입니다.
-- 기존 지원 품종 사진 4장을 보존하고 16장을 추가했습니다. Oxford-IIIT Pet의 37품종 목록에 없는 골든 리트리버는 원본과 출처를 `data/out-of-scope/`에 별도 보관했습니다.
+- 기존 지원 품종 사진 4장을 보존하고 16장을 추가했습니다. Oxford-IIIT Pet의 37품종 목록에 없는 골든 리트리버는 원본과 출처를 `input/out-of-scope/`에 별도 보관했습니다.
 - 사진 파일의 육안 확인, 디코딩, 크기·SHA-256 대조, 파일과 CSV의 일대일 대응, 중복 후보 검사를 수행했습니다.
-- **프로그램 구현과 모델 추론·속도·정확도는 아직 검증하지 않았습니다.** 실행 명령은 구현 및 실행 확인 후 추가합니다.
+- **프로그램 구현과 모델 추론·속도·정확도는 아직 검증하지 않았습니다.** 현재 실행 명령은 입력 목록 확인용이며, 추론 명령은 구현·검증 후 추가합니다.
 
 ## 사진과 출처
 
 |자료|위치|
 |---|---|
-|지원 품종 사진 20장|[data/smoke-test/images](data/smoke-test/images)|
+|지원 품종 사진 20장|[input/images](input/images)|
 |사진별 품종·저자·출처·라이선스·해시|[metadata.csv](data/smoke-test/metadata.csv)|
 |라이선스 근거와 품질 주의사항|[SOURCES.md](data/smoke-test/SOURCES.md)|
 |사진 검토·실제 다운로드 주소|[photo-review.json](data/smoke-test/photo-review.json)|

@@ -7,3 +7,5 @@
 원본 출처: https://commons.wikimedia.org/wiki/File:Golden_Retriever_%28Pet_Dog%29.jpg
 
 이미지 라이선스: CC0-1.0. 기존 기록은 metadata.csv에 있습니다.
+
+현재 사진 위치: [input/out-of-scope/golden_retriever.jpg](../../input/out-of-scope/golden_retriever.jpg). 메타데이터와 원본 파일은 보존했습니다.

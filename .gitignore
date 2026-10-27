@@ -8,11 +8,14 @@ __pycache__/
 # Local IntelliJ configuration and downloaded models.
 .idea/
 *.iml
-models/
+models/*
+!models/.gitkeep
 *.pt
 *.pth
 
 # Generated results and local secrets.
+output/*
+!output/.gitkeep
 outputs/
 logs/
 .env
