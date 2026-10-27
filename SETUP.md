@@ -50,10 +50,6 @@ GitHub에서 Clone/Pull만 한다고 컴퓨터에서 스크립트가 저절로 �
 .\setup.bat --venv-only
 ```
 
-이 파일들은 개발 환경을 준비합니다. 반려동물 사진을 추론하는 프로그램과 모델 다운로드는 별도 구현 단계입니다.
+환경 준비 후 공식 데이터셋을 datasets/oxford-iiit-pet/images와 annotations에 놓습니다. main.py는 기본적으로 공식 test 목록의 처음 20장을 처리합니다. 데이터셋 준비 전에는 --samples 옵션 또는 source/examples의 2번·3번 예제로 확인하세요. 모델은 첫 실행에 models로 자동 다운로드하며 대용량 파일은 Git에서 제외합니다.
 
-## 프로젝트 구조와 시작 파일
-
-입력 사진은 `input/images/`, 결과는 `output/`, 코드는 `source/`, 모델은 `models/`, 출처·정답 관련 표는 `data/`에 둡니다. 기존 data/smoke-test/images의 20장은 input/images로 이동했습니다.
-
-SDK 선택 후 `source/main.py`를 우클릭하고 **Run 'main'**을 누르세요. 현재 시작 파일은 사진 목록과 경로만 확인합니다. 모델 추론은 다음 구현 단계입니다.
+상세 폴더 구조와 명령은 README.md를 참고하세요.

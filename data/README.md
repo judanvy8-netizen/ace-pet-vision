@@ -1,12 +1,7 @@
-# 표와 출처 기록
+# 출처와 검토 기록
 
-사진 파일 자체는 `input/`에 두고, 이 폴더에는 품종·출처·저자·라이선스와 검토 기록을 보관합니다.
+smoke-test에는 input/images의 예제 사진 20장에 대한 출처·품종 표와 수집 당시 검토 기록을 보관합니다. CSV의 filename은 input/images 안의 파일명입니다.
 
-| 기록 위치 | 대응 사진 위치 |
-|---|---|
-| `smoke-test/metadata.csv` 및 검토 기록 | `../input/images/` (프로젝트 루트 기준 `input/images/`) |
-| `out-of-scope/metadata.csv` | 프로젝트 루트 기준 `input/out-of-scope/` |
+원본 Oxford 이미지·annotations는 datasets/oxford-iiit-pet에 보관합니다. 모델 실행 결과와 정답 비교표는 output에 저장합니다. 기존 검토 JSON은 수집 시점의 기록이며 현재 실행 성능을 의미하지 않습니다.
 
-CSV의 `filename`은 대응 사진 폴더 안의 파일명입니다. 위치를 정리하면서 사진 바이트, 파일명, 해시, 원래 라벨은 바꾸지 않았습니다. 기존 validation-results.json은 사진 수집 당시의 검사 기록입니다.
-
-향후 수작업 정답표와 평가용 표도 이 폴더에 추가합니다. 현재 메타데이터는 출처 표기에 근거한 입력 확인용 자료이며, 독립적으로 검증된 최종 평가 정답표는 아닙니다.
+요청에 따라 지원 범위 밖 사진과 data/out-of-scope 기록은 제거했습니다.
