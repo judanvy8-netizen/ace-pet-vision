@@ -1,7 +1,7 @@
 """Oxford-IIIT Pet 공식 images + annotations 폴더 읽기."""
 import re
 from pathlib import Path
-from pet_model import EXPECTED_CLASSES
+from breed_classifier import EXPECTED_CLASSES
 
 
 def load_split(dataset_dir, split="test", limit=20):

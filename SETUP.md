@@ -50,6 +50,6 @@ GitHub에서 Clone/Pull만 한다고 컴퓨터에서 스크립트가 저절로 �
 .\setup.bat --venv-only
 ```
 
-환경 준비 후 공식 데이터셋을 datasets/oxford-iiit-pet/images와 annotations에 놓습니다. main.py는 기본적으로 공식 test 목록의 처음 20장을 처리합니다. 데이터셋 준비 전에는 --samples 옵션 또는 source/examples의 2번·3번 예제로 확인하세요. 모델은 첫 실행에 models로 자동 다운로드하며 대용량 파일은 Git에서 제외합니다.
+환경 준비 후 공식 데이터셋을 data/oxford-iiit-pet/images와 annotations에 놓습니다. main.py는 기본적으로 공식 test 목록의 처음 20장을 처리합니다. 데이터셋 준비 전에는 --samples 옵션 또는 source/examples의 2번·3번 예제로 확인하세요. 모델은 첫 실행에 models로 자동 다운로드하며 대용량 파일은 Git에서 제외합니다.
 
 상세 폴더 구조와 명령은 README.md를 참고하세요.

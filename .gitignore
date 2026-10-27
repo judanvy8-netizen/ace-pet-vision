@@ -1,29 +1,32 @@
-# Each computer creates its own virtual environment.
+# Local Python environment and IDE files
 .venv*/
 venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
-
-# Local IntelliJ configuration and downloaded models.
 .idea/
 *.iml
+
+# Large datasets and personal photos
+data/oxford-iiit-pet/*
+!data/oxford-iiit-pet/.gitkeep
+data/my-photos/
+images.tar.gz
+annotations.tar.gz
+
+# Downloaded models and generated results
 models/*
 !models/.gitkeep
 *.pt
 *.pth
+outputs/*
+!outputs/.gitkeep
 
-# Generated results and local secrets.
-output/*
-!output/.gitkeep
-outputs/
+# Legacy local folders remain ignored after upgrading
+datasets/
+output/
+
 logs/
 .env
 .env.*
 !.env.example
-
-# Large Oxford dataset: local only.
-datasets/*
-!datasets/.gitkeep
-images.tar.gz
-annotations.tar.gz

@@ -1,6 +1,8 @@
-"""IntelliJ에서 실행: input/images -> 동물 탐지·품종 분류 -> output."""
+"""통합·실행 담당: 입력 선택 → 탐지·분류 → 결과 저장.
+IntelliJ에서 이 파일을 실행합니다. 예제 사진은 --samples 옵션을 사용하세요.
+설명할 함수: main, process_images. 기본 실행값은 config.py에서 관리합니다.
+"""
 import argparse
-import csv
 from datetime import datetime
 import json
 import logging
@@ -8,64 +10,13 @@ from pathlib import Path
 import sys
 import time
 
-ROOT = Path(__file__).resolve().parents[1]
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
-FIELDS = ["filename", "object_id", "species", "breed", "candidate_breed", "breed_confidence",
-          "detection_confidence", "status", "reason", "x1", "y1", "x2", "y2", "top3_json",
-          "result_image", "crop_image", "image_processing_ms"]
-SUMMARY_FIELDS = ["filename", "status", "animal_count", "processing_ms", "error", "result_image"]
-
-
-def project_path(path):
-    return (path if path.is_absolute() else ROOT / path).resolve()
-
-
-def find_images(folder):
-    if folder.is_file():
-        return [folder] if folder.suffix.lower() in IMAGE_EXTENSIONS else []
-    if not folder.is_dir():
-        raise ValueError(f"입력 폴더가 없습니다: {folder}")
-    return sorted(p for p in folder.rglob("*") if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS)
-
-
-def write_csv(path, rows, fields):
-    temporary = path.with_suffix(".tmp.csv")
-    with temporary.open("w", encoding="utf-8-sig", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
-        writer.writeheader()
-        writer.writerows(rows)
-    temporary.replace(path)
-
-
-def annotate(image, predictions):
-    from PIL import ImageDraw, ImageFont
-    result = image.copy()
-    draw = ImageDraw.Draw(result)
-    size = max(12, min(28, round(image.width / 50)))
-    font = ImageFont.load_default(size=size)
-    for number, prediction in enumerate(predictions, 1):
-        x1, y1, x2, y2 = (prediction[k] for k in ("x1", "y1", "x2", "y2"))
-        color = (50, 210, 120) if prediction["species"] == "dog" else (80, 180, 255)
-        draw.rectangle((x1, y1, x2 - 1, y2 - 1), outline=color, width=max(2, round(image.width / 500)))
-        label = (f'#{number} {prediction["species"]}: {prediction["breed"]}'
-                 + (f' {prediction["breed_confidence"]:.0%}' if prediction["status"] == "classified" else " (review)"))
-        current_font = font
-        while draw.textbbox((0, 0), label, font=current_font)[2] > image.width - 8 and size > 8:
-            size -= 1
-            current_font = ImageFont.load_default(size=size)
-        box = draw.textbbox((0, 0), label, font=current_font)
-        width, height = box[2] + 8, box[3] - box[1] + 8
-        x = min(x1, max(0, image.width - width))
-        y = max(0, y1 - height)
-        draw.rectangle((x, y, min(image.width - 1, x + width), y + height), fill=color)
-        draw.text((x + 4, y + 4 - box[1]), label, font=current_font, fill=(0, 0, 0))
-    if not predictions:
-        draw.text((8, 8), "No cat/dog detected", font=font, fill=(255, 70, 70), stroke_width=1, stroke_fill=(0, 0, 0))
-    return result
+from config import (INPUT_DIR, DATASET_DIR, MODEL_DIR, OUTPUT_DIR,
+                    DETECTION_CONFIDENCE, BREED_CONFIDENCE, IMAGE_LIMIT)
+from data_loader import project_path, find_images, read_image
+from visualizer import annotate, save_image, write_csv, FIELDS, SUMMARY_FIELDS
 
 
 def process_images(files, input_root, run_dir, model):
-    from PIL import Image, ImageOps
     all_rows, summary = [], []
     for index, path in enumerate(files, 1):
         filename = path.relative_to(input_root).as_posix()
@@ -73,19 +24,17 @@ def process_images(files, input_root, run_dir, model):
         info = {"filename": filename, "status": "error", "animal_count": 0,
                 "processing_ms": 0, "error": "", "result_image": ""}
         try:
-            with Image.open(path) as raw:
-                image = ImageOps.exif_transpose(raw).convert("RGB")
+            image = read_image(path)
             predictions = model.predict(image)
             # 확장자도 보존하여 같은 이름의 JPG/PNG가 서로 덮어쓰지 않게 합니다.
             result_path = Path("images") / (filename + ".png")
             destination = run_dir / result_path
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            annotate(image, predictions).save(destination)
+            save_image(annotate(image, predictions), destination)
             rows = []
             for number, prediction in enumerate(predictions, 1):
                 crop_path = Path("crops") / filename / f"animal_{number:02d}.png"
-                (run_dir / crop_path).parent.mkdir(parents=True, exist_ok=True)
-                image.crop(tuple(prediction[k] for k in ("x1", "y1", "x2", "y2"))).save(run_dir / crop_path)
+                crop = image.crop(tuple(prediction[k] for k in ("x1", "y1", "x2", "y2")))
+                save_image(crop, run_dir / crop_path)
                 details = {key: value for key, value in prediction.items() if key != "top3"}
                 rows.append({"filename": filename, "object_id": number, **details,
                              "top3_json": json.dumps(prediction["top3"], ensure_ascii=False),
@@ -119,26 +68,26 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="ACE 반려동물 탐지·Oxford 37품종 분류")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--input", type=Path, help="직접 준비한 사진 폴더 또는 사진 한 장")
-    mode.add_argument("--samples", action="store_true", help="input/images의 기존 예제 사진 사용")
-    parser.add_argument("--dataset", type=Path, default=ROOT / "datasets" / "oxford-iiit-pet")
+    mode.add_argument("--samples", action="store_true", help="data/images의 기존 예제 사진 사용")
+    parser.add_argument("--dataset", type=Path, default=DATASET_DIR)
     parser.add_argument("--split", choices=["test", "trainval"], default="test")
-    parser.add_argument("--limit", type=int, default=20, help="처음 처리할 사진 수. 기본 20장, 0이면 전체")
-    parser.add_argument("--output", type=Path, default=ROOT / "output")
-    parser.add_argument("--conf", type=probability, default=0.25, help="동물 탐지 임계값")
-    parser.add_argument("--breed-conf", type=probability, default=0.5, help="품종 후보 보류 임계값")
+    parser.add_argument("--limit", type=int, default=IMAGE_LIMIT, help="처음 처리할 사진 수. 0이면 전체; 기본값은 config.py 참조")
+    parser.add_argument("--output", type=Path, default=OUTPUT_DIR)
+    parser.add_argument("--conf", type=probability, default=DETECTION_CONFIDENCE, help="동물 탐지 임계값")
+    parser.add_argument("--breed-conf", type=probability, default=BREED_CONFIDENCE, help="품종 후보 보류 임계값")
     parser.add_argument("--prepare-models", action="store_true", help="사진 처리 없이 모델만 미리 다운로드")
     args = parser.parse_args(argv)
     if args.limit < 0:
         parser.error("--limit는 0 이상이어야 합니다.")
     from pet_model import PetModel, prepare_models, BREED_REVISION
     if args.prepare_models:
-        prepare_models(ROOT / "models")
-        print("모델 준비 완료. 이제 input/images에 사진을 넣고 main.py를 실행하세요.")
+        prepare_models(MODEL_DIR)
+        print("모델 준비 완료. Oxford 데이터셋으로 실행하거나 --samples로 기존 예제를 실행하세요.")
         return 0
     truth = None
     output = project_path(args.output)
     if args.input is not None or args.samples:
-        source = project_path(args.input or ROOT / "input" / "images")
+        source = project_path(args.input or INPUT_DIR)
         files = find_images(source)
         total = len(files)
         if args.limit:
@@ -166,7 +115,7 @@ def main(argv=None):
     config_path.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
     try:
         print("모델 준비 중입니다. 첫 실행에는 모델 다운로드가 필요합니다.", flush=True)
-        model = PetModel(ROOT / "models", args.conf, args.breed_conf)
+        model = PetModel(MODEL_DIR, args.conf, args.breed_conf)
         rows, summary = process_images(files, input_root, run_dir, model)
         if truth is not None:
             from oxford_data import compare_predictions

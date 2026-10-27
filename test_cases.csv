@@ -1,0 +1,21 @@
+﻿case_id,input_path,expected_species,expected_breed,label_basis
+SAMPLE_01,data/images/siamese.jpg,cat,Siamese,source description; see data/smoke-test/metadata.csv
+SAMPLE_02,data/images/persian.jpg,cat,Persian,source description; see data/smoke-test/metadata.csv
+SAMPLE_03,data/images/beagle.jpg,dog,Beagle,source description; see data/smoke-test/metadata.csv
+SAMPLE_04,data/images/pug.jpg,dog,Pug,source description; see data/smoke-test/metadata.csv
+SAMPLE_05,data/images/abyssinian.jpg,cat,Abyssinian,source description; see data/smoke-test/metadata.csv
+SAMPLE_06,data/images/birman.png,cat,Birman,source description; see data/smoke-test/metadata.csv
+SAMPLE_07,data/images/maine_coon.jpg,cat,Maine Coon,source description; see data/smoke-test/metadata.csv
+SAMPLE_08,data/images/ragdoll.jpg,cat,Ragdoll,source description; see data/smoke-test/metadata.csv
+SAMPLE_09,data/images/russian_blue.jpg,cat,Russian Blue,source description; see data/smoke-test/metadata.csv
+SAMPLE_10,data/images/british_shorthair.png,cat,British Shorthair,source description; see data/smoke-test/metadata.csv
+SAMPLE_11,data/images/bengal.jpg,cat,Bengal,source description; see data/smoke-test/metadata.csv
+SAMPLE_12,data/images/sphynx.jpg,cat,Sphynx,source description; see data/smoke-test/metadata.csv
+SAMPLE_13,data/images/basset_hound.jpg,dog,Basset Hound,source description; see data/smoke-test/metadata.csv
+SAMPLE_14,data/images/boxer.jpg,dog,Boxer,source description; see data/smoke-test/metadata.csv
+SAMPLE_15,data/images/pomeranian.jpg,dog,Pomeranian,source description; see data/smoke-test/metadata.csv
+SAMPLE_16,data/images/shiba_inu.jpg,dog,Shiba Inu,source description; see data/smoke-test/metadata.csv
+SAMPLE_17,data/images/yorkshire_terrier.jpg,dog,Yorkshire Terrier,source description; see data/smoke-test/metadata.csv
+SAMPLE_18,data/images/samoyed.jpg,dog,Samoyed,source description; see data/smoke-test/metadata.csv
+SAMPLE_19,data/images/chihuahua.jpg,dog,Chihuahua,source description; see data/smoke-test/metadata.csv
+SAMPLE_20,data/images/english_setter.jpg,dog,English Setter,source description; see data/smoke-test/metadata.csv

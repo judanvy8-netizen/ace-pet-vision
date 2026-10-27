@@ -1,26 +1,23 @@
-"""예제 2: YOLO11n으로 개·고양이만 탐지하고 박스 이미지 저장."""
+"""예제 2: 탐지 담당 모듈을 사용해 개·고양이 위치를 표시합니다."""
 from pathlib import Path
-import os
 import sys
-from PIL import Image, ImageOps
-
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "source"))
-from pet_model import download_verified, YOLO_URL, YOLO_SHA256
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from config import INPUT_DIR, MODEL_DIR, OUTPUT_DIR
+from data_loader import read_image
+from model_loader import download_verified, YOLO_URL, YOLO_SHA256
+from pet_detector import PetDetector
+from visualizer import annotate, save_image
 
 if __name__ == "__main__":
-    # 다른 사진으로 실습하려면 이 파일명을 바꾸세요.
-    photo_path = ROOT / "input" / "images" / "beagle.jpg"
-    weights = download_verified(YOLO_URL, ROOT / "models" / "yolo11n.pt", YOLO_SHA256)
-    os.environ.setdefault("YOLO_CONFIG_DIR", str(ROOT / "models" / "ultralytics_settings"))
-    from ultralytics import YOLO
-    model = YOLO(str(weights))
-    with Image.open(photo_path) as raw:
-        photo = ImageOps.exif_transpose(raw).convert("RGB")
-    result = model.predict(photo, classes=[15, 16], conf=0.25, device="cpu", verbose=False)[0]
-    for box in result.boxes:
-        print(model.names[int(box.cls.item())], box.xyxy[0].tolist(), f"{box.conf.item():.1%}")
-    output = ROOT / "output" / "examples" / "detection.png"
-    output.parent.mkdir(parents=True, exist_ok=True)
-    Image.fromarray(result.plot()[:, :, ::-1]).save(output)
+    photo_path = INPUT_DIR / "beagle.jpg"  # 다른 사진으로 바꿔 실습하세요.
+    weights = download_verified(YOLO_URL, MODEL_DIR / "yolo11n.pt", YOLO_SHA256)
+    photo = read_image(photo_path)
+    detections = PetDetector(weights).detect(photo)
+    for animal in detections:
+        print(animal)
+    # 탐지만 수행하므로 품종 결과는 표시하지 않습니다.
+    labels = [{**animal, "breed": "not classified", "status": "detected"}
+              for animal in detections]
+    output = OUTPUT_DIR / "examples" / "detection.png"
+    save_image(annotate(photo, labels), output)
     print("탐지 이미지 저장:", output)

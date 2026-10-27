@@ -1,18 +1,18 @@
 """예제 3: 사진 한 장을 탐지·크롭한 뒤 품종 상위 후보 3개 출력."""
 from pathlib import Path
 import sys
-from PIL import Image, ImageOps
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "source"))
 from pet_model import PetModel
+from data_loader import read_image
+from config import INPUT_DIR, MODEL_DIR
 
 if __name__ == "__main__":
     # 다른 사진으로 실습하려면 이 파일명을 바꾸세요.
-    photo_path = ROOT / "input" / "images" / "beagle.jpg"
-    model = PetModel(ROOT / "models")
-    with Image.open(photo_path) as raw:
-        photo = ImageOps.exif_transpose(raw).convert("RGB")
+    photo_path = INPUT_DIR / "beagle.jpg"
+    model = PetModel(MODEL_DIR)
+    photo = read_image(photo_path)
     animals = model.predict(photo)
     if not animals:
         print("개·고양이를 찾지 못했습니다.")
