@@ -8,8 +8,9 @@ DOG_COLOR = (50, 210, 120)
 CAT_COLOR = (80, 180, 255)
 FIELDS = ["filename", "object_id", "species", "breed", "candidate_breed", "breed_confidence",
           "detection_confidence", "status", "reason", "x1", "y1", "x2", "y2", "top3_json",
-          "result_image", "crop_image", "image_processing_ms"]
-SUMMARY_FIELDS = ["filename", "status", "animal_count", "dog_count", "cat_count", "processing_ms", "error", "result_image"]
+          "result_image", "image_processing_ms"]
+SUMMARY_FIELDS = ["filename", "cat", "dog", "actual_cat", "actual_dog", "cat_error", "dog_error",
+                  "status", "animal_count", "processing_ms", "error", "result_image"]
 
 
 def animal_counts(predictions):
@@ -69,4 +70,10 @@ def annotate(image, predictions):
 
 def save_image(image, destination):
     destination.parent.mkdir(parents=True, exist_ok=True)
-    image.save(destination)
+    import cv2
+    import numpy as np
+    bgr = cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
+    success, encoded = cv2.imencode(destination.suffix, bgr)
+    if not success:
+        raise OSError(f"이미지 인코딩 실패: {destination}")
+    encoded.tofile(destination)

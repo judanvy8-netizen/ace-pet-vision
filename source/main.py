@@ -2,7 +2,7 @@
 IntelliJ에서 이 파일을 실행하면 data/images의 사진을 처리합니다.
 """
 import argparse
-from datetime import datetime
+import csv
 import json
 import logging
 from pathlib import Path
@@ -36,53 +36,94 @@ def find_images(folder):
 
 
 def read_image(path):
-    from PIL import Image, ImageOps
-    with Image.open(path) as raw:
-        return ImageOps.exif_transpose(raw).convert("RGB")
+    """OpenCV로 한글 경로 사진을 읽고 분류 모델용 RGB 이미지로 변환합니다."""
+    import cv2
+    import numpy as np
+    from PIL import Image
+    image = cv2.imdecode(np.fromfile(path, dtype=np.uint8), cv2.IMREAD_COLOR)
+    if image is None:
+        raise ValueError(f"읽을 수 없는 이미지입니다: {path.name}")
+    return Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+
+
+def read_ground_truth(path):
+    """정답은 사람이 작성합니다. 빈 칸을 0마리로 취급하지 않습니다."""
+    if not path.is_file():
+        return {}
+    truth = {}
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if not {"filename", "actual_cat", "actual_dog"}.issubset(reader.fieldnames or []):
+            raise ValueError("정답표에 filename, actual_cat, actual_dog 열이 필요합니다.")
+        for row in reader:
+            name = row["filename"].strip().replace("\\", "/")
+            if not name or name in truth:
+                raise ValueError(f"정답표 파일명이 비었거나 중복입니다: {name}")
+            counts = {}
+            for key in ("actual_cat", "actual_dog"):
+                value = (row[key] or "").strip()
+                if value and not (value.isascii() and value.isdigit()):
+                    raise ValueError(f"정답표 {name}: {key}는 0 이상의 정수 또는 빈 칸이어야 합니다.")
+                counts[key] = int(value) if value else None
+            truth[name] = counts
+    return truth
+
 
 # 3. 전체 실행
-def process_images(files, input_root, run_dir, model):
+def process_images(files, input_root, run_dir, model, truth=None):
     all_rows, summary = [], []
+    used_paths = set()
+    truth = truth or {}
     for index, path in enumerate(files, 1):
         filename = path.relative_to(input_root).as_posix()
         started = time.perf_counter()
         info = {"filename": filename, "status": "error", "animal_count": 0,
-                "dog_count": "", "cat_count": "", "processing_ms": 0, "error": "", "result_image": ""}
+                "dog": "", "cat": "", "actual_cat": "", "actual_dog": "",
+                "cat_error": "", "dog_error": "", "processing_ms": 0, "error": "", "result_image": ""}
         try:
             image = read_image(path)
             predictions = model.predict(image)
-            # 확장자도 보존하여 같은 이름의 JPG/PNG가 서로 덮어쓰지 않게 합니다.
-            result_path = Path("images") / (filename + ".png")
+            # 기본 자료의 img_001_pets.jpg 형식. 같은 이름은 순번으로 구분합니다.
+            relative = Path(filename)
+            result_path = relative.with_name(relative.stem + "_pets.jpg")
+            suffix = 2
+            while result_path.as_posix().casefold() in used_paths:
+                result_path = relative.with_name(f"{relative.stem}_{suffix}_pets.jpg")
+                suffix += 1
+            used_paths.add(result_path.as_posix().casefold())
             destination = run_dir / result_path
             save_image(annotate(image, predictions), destination)
             rows = []
             for number, prediction in enumerate(predictions, 1):
-                crop_path = Path("crops") / filename / f"animal_{number:02d}.png"
-                crop = image.crop(tuple(prediction[k] for k in ("x1", "y1", "x2", "y2")))
-                save_image(crop, run_dir / crop_path)
                 details = {key: value for key, value in prediction.items() if key != "top3"}
                 rows.append({"filename": filename, "object_id": number, **details,
                              "top3_json": json.dumps(prediction["top3"], ensure_ascii=False),
-                             "result_image": result_path.as_posix(), "crop_image": crop_path.as_posix(),
+                             "result_image": result_path.as_posix(),
                              "image_processing_ms": 0})
             elapsed = round((time.perf_counter() - started) * 1000, 2)
             for row in rows:
                 row["image_processing_ms"] = elapsed
             all_rows.extend(rows)
+            counts = animal_counts(predictions)
             info.update(status="ok" if predictions else "no_detection", animal_count=len(predictions),
-                        **animal_counts(predictions),
+                        dog=counts["dog_count"], cat=counts["cat_count"],
                         result_image=result_path.as_posix())
         except Exception as error:
             info["error"] = f"{type(error).__name__}: {error}"
             logging.exception("사진 처리 실패: %s", filename)
+        for species in ("cat", "dog"):
+            actual = truth.get(filename, {}).get("actual_" + species)
+            info["actual_" + species] = actual if actual is not None else ""
+            if actual is not None and info["status"] != "error":
+                info[species + "_error"] = abs(info[species] - actual)
         info["processing_ms"] = round((time.perf_counter() - started) * 1000, 2)
         summary.append(info)
-        write_csv(run_dir / "results.csv", all_rows, FIELDS)
-        write_csv(run_dir / "image_summary.csv", summary, SUMMARY_FIELDS)
+        write_csv(run_dir / "pet_breeds.csv", all_rows, FIELDS)
+        write_csv(run_dir / "pet_counts.csv", summary, SUMMARY_FIELDS)
         if info["status"] == "error":
             print(f'[{index}/{len(files)}] {filename}: 처리 실패 — {info["error"]}', flush=True)
         else:
-            print(f'[{index}/{len(files)}] {filename}: 개 {info["dog_count"]}마리 / 고양이 {info["cat_count"]}마리', flush=True)
+            print(f'[{index}/{len(files)}] {filename}: 개 {info["dog"]}마리 / 고양이 {info["cat"]}마리', flush=True)
             for number, animal in enumerate(predictions, 1):
                 species = "개" if animal["species"] == "dog" else "고양이"
                 breed = animal["breed"] if animal["status"] == "classified" else f'판단 보류 (후보: {animal["candidate_breed"]})'
@@ -103,6 +144,7 @@ def main(argv=None):
     mode.add_argument("--input", type=Path, default=INPUT_DIR, help="직접 준비한 사진 폴더 또는 사진 한 장")
     mode.add_argument("--samples", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--limit", type=int, default=IMAGE_LIMIT, help="처음 처리할 사진 수. 0이면 전체; 기본값은 main.py 상단 참조")
+    parser.add_argument("--truth", type=Path, default=ROOT / "data" / "ground_truth.csv", help="사람이 작성한 개수 정답표")
     parser.add_argument("--output", type=Path, default=OUTPUT_DIR)
     parser.add_argument("--conf", type=probability, default=DETECTION_CONFIDENCE, help="동물 탐지 임계값")
     parser.add_argument("--breed-conf", type=probability, default=BREED_CONFIDENCE, help="품종 후보 보류 임계값")
@@ -126,9 +168,10 @@ def main(argv=None):
     input_root = source.parent if source.is_file() else source
     if output == input_root or input_root in output.parents:
         raise ValueError("결과 폴더는 입력 사진 폴더 바깥에 지정하세요.")
-    run_dir = output / datetime.now().strftime("run_%Y%m%d_%H%M%S_%f")
-    run_dir.mkdir(parents=True, exist_ok=False)
-    logging.basicConfig(filename=run_dir / "errors.log", level=logging.ERROR, encoding="utf-8", force=True)
+    truth = read_ground_truth(project_path(args.truth))
+    run_dir = output
+    run_dir.mkdir(parents=True, exist_ok=True)
+    logging.basicConfig(filename=run_dir / "errors.log", level=logging.ERROR, encoding="utf-8", filemode="w", force=True)
     config = {"input": str(source), "input_count": len(files), "detection_conf": args.conf,
               "breed_conf": args.breed_conf, "breed_model": "flaviodell/oxford-pets-resnet50",
               "breed_revision": BREED_REVISION, "device": "cpu", "completed": False}
@@ -137,13 +180,15 @@ def main(argv=None):
     config_path.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
     try:
         print("모델 준비 중입니다. 첫 실행에는 모델 다운로드가 필요합니다.", flush=True)
+        write_csv(run_dir / "pet_counts.csv", [], SUMMARY_FIELDS)
+        write_csv(run_dir / "pet_breeds.csv", [], FIELDS)
         model = PetModel(MODEL_DIR, args.conf, args.breed_conf)
-        rows, summary = process_images(files, input_root, run_dir, model)
+        rows, summary = process_images(files, input_root, run_dir, model, truth)
         errors = sum(row["status"] == "error" for row in summary)
         config.update(completed=True, failed_images=errors, detected_animals=len(rows))
         config_path.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
         print(f"\n결과 폴더: {run_dir}")
-        print("images: 동물 수·품종 표시 / results.csv: 개체별 품종 / image_summary.csv: 사진별 개·고양이 수")
+        print("*_pets.jpg: 결과 사진 / pet_counts.csv: 개·고양이 수와 정답 비교 / pet_breeds.csv: 품종 후보")
         return 1 if errors else 0
     except Exception:
         logging.exception("실행 실패")
