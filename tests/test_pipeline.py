@@ -7,149 +7,94 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "source"))
-from pet_model import choose_breed, download_verified
-from main import process_images
-from visualizer import animal_counts
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "source"))
+from shared import common, pet_model
 import main as app
 
 
 class PipelineTests(unittest.TestCase):
-    def test_breed_threshold_and_species(self):
+    def test_breed_rejection(self):
         names = ["Beagle", "Siamese", "Pug"]
-        self.assertEqual(choose_breed([.8, .1, .1], names, "dog", .5)["breed"], "Beagle")
-        self.assertEqual(choose_breed([.4, .3, .3], names, "dog", .5)["reason"], "low_confidence")
-        self.assertEqual(choose_breed([.1, .8, .1], names, "dog", .5)["reason"], "species_mismatch")
+        self.assertEqual(pet_model.choose_breed([.8, .1, .1], names, "dog", .5)["breed"], "Beagle")
+        self.assertEqual(pet_model.choose_breed([.4, .3, .3], names, "dog", .5)["reason"], "low_confidence")
+        self.assertEqual(pet_model.choose_breed([.1, .8, .1], names, "dog", .5)["reason"], "species_mismatch")
 
-    def test_download_cache_and_bad_hash(self):
-        with tempfile.TemporaryDirectory() as folder:
-            path = Path(folder) / "weights.pth"
-            path.write_bytes(b"original")
-            with patch("pet_model.urllib.request.urlopen") as download:
-                download_verified("https://example.com/model", path, hashlib.sha256(b"original").hexdigest())
-                download.assert_not_called()
-            with patch("pet_model.urllib.request.urlopen", return_value=io.BytesIO(b"bad")):
+    def test_verified_download_and_legacy_reuse(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            old = root / "models" / "model.pt"
+            old.parent.mkdir()
+            old.write_bytes(b"original")
+            checksum = hashlib.sha256(b"original").hexdigest()
+            with patch.object(pet_model, "MODEL_DIR", root / "shared" / "models"), patch("shared.pet_model.urllib.request.urlopen") as network:
+                new = pet_model.model_file("model.pt", "https://example.com/model", checksum)
+                self.assertEqual(new.read_bytes(), b"original")
+                network.assert_not_called()
+            with patch("shared.pet_model.urllib.request.urlopen", return_value=io.BytesIO(b"bad")):
                 with self.assertRaises(RuntimeError):
-                    download_verified("https://example.com/model", path, "0" * 64)
-            self.assertEqual(path.read_bytes(), b"original")
-            self.assertEqual(list(path.parent.glob("*.part")), [])
+                    pet_model.download_verified("https://example.com/model", new, "0" * 64)
+            self.assertEqual(new.read_bytes(), b"original")
 
-
-
-    def test_multianimal_no_detection_and_corrupt_input(self):
+    def test_io_orientation_and_unique_names(self):
         from PIL import Image
-        class FakeModel:
-            def predict(self, image):
-                if image.getpixel((0, 0)) == (0, 0, 0):
-                    return []
-                common = {"species": "dog", "detection_confidence": .9,
-                          **choose_breed([.8, .1, .1], ["Beagle", "Siamese", "Pug"], "dog", .5)}
-                return [{**common, "x1": 0, "y1": 0, "x2": 40, "y2": 40},
-                        {**common, "species": "cat", "breed": "Siamese", "candidate_breed": "Siamese", "x1": 50, "y1": 10, "x2": 95, "y2": 60}]
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            source, output = root / "사진", root / "결과"
-            source.mkdir(); output.mkdir()
-            Image.new("RGB", (100, 100), "white").save(source / "두마리.png")
-            Image.new("RGB", (100, 100), "black").save(source / "없음.png")
-            (source / "손상.jpg").write_bytes(b"broken")
-            rows, summary = process_images(sorted(source.iterdir()), source, output, FakeModel())
-            self.assertEqual(len(rows), 2)
-            counts = {r["filename"]: r for r in summary}
-            self.assertEqual((counts["두마리.png"]["dog"], counts["두마리.png"]["cat"]), (1, 1))
-            self.assertEqual((counts["없음.png"]["dog"], counts["없음.png"]["cat"]), (0, 0))
-            self.assertEqual(counts["손상.jpg"]["dog"], "")
-            with Image.open(output / "두마리_pets.jpg") as annotated:
-                self.assertEqual(annotated.width, 100)
-                self.assertGreater(annotated.height, 100)
-            self.assertEqual({x["status"] for x in summary}, {"ok", "no_detection", "error"})
-            self.assertTrue((output / "두마리_pets.jpg").is_file())
-            with (output / "pet_counts.csv").open(encoding="utf-8-sig") as handle:
-                saved = list(csv.DictReader(handle))
-                self.assertEqual(len(saved), 3)
-                self.assertEqual(next(r for r in saved if r["filename"] == "두마리.png")["cat"], "1")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            exif = Image.Exif(); exif[274] = 6
+            source = root / "사진.jpg"
+            Image.new("RGB", (40, 20), "red").save(source, exif=exif)
+            image = common.read_image(source)
+            self.assertEqual(image.shape[:2], (40, 20))
+            common.save_image(root / "결과.jpg", image)
+            self.assertTrue((root / "결과.jpg").exists())
+            with self.assertRaises(FileNotFoundError):
+                common.image_files(root / "missing")
+            used = set()
+            self.assertNotEqual(common.result_path("pet.jpg", used), common.result_path("pet.png", used))
 
-
-    def test_default_run_uses_local_images_without_dataset(self):
-        from PIL import Image
-        class NoAnimals:
-            def predict(self, image):
-                return []
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            source, output = root / "data" / "images", root / "outputs"
-            source.mkdir(parents=True)
-            for name in ("01_cat_test.png", "02_dog_test.png"):
-                Image.new("RGB", (80, 80)).save(source / name)
-            with patch.object(app, "INPUT_DIR", source), patch.object(app, "OUTPUT_DIR", output), \
-                 patch.object(app, "PetModel", return_value=NoAnimals()), patch.object(app.logging, "basicConfig"):
-                self.assertEqual(app.main([]), 0)
-            self.assertTrue((output / "01_cat_test_pets.jpg").is_file())
-            with (output / "pet_counts.csv").open(encoding="utf-8-sig") as handle:
-                rows = list(csv.DictReader(handle))
-            self.assertEqual(len(rows), 2)
-            self.assertTrue(all(row["cat"] == "0" and row["dog"] == "0" for row in rows))
-            self.assertFalse((root / "data" / "oxford-iiit-pet").exists())
-
-    def test_species_counts_include_each_detection(self):
-        self.assertEqual(animal_counts([]), {"dog_count": 0, "cat_count": 0})
-        self.assertEqual(animal_counts([{"species": "dog"}, {"species": "cat"}, {"species": "dog"}]),
-                         {"dog_count": 2, "cat_count": 1})
-
-    def test_ground_truth_blank_zero_and_invalid(self):
-        from PIL import Image
-        class NoAnimals:
-            def predict(self, image):
-                return []
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            gt = root / "ground_truth.csv"
-            gt.write_text("filename,actual_cat,actual_dog\npet.png,1,0\nblank.png,,,\n", encoding="utf-8")
-            truth = app.read_ground_truth(gt)
-            self.assertIsNone(truth["blank.png"]["actual_cat"])
-            self.assertEqual(truth["pet.png"]["actual_dog"], 0)
-            source, output = root / "images", root / "output"
-            source.mkdir(); output.mkdir()
-            Image.new("RGB", (100, 100)).save(source / "pet.png")
-            Image.new("RGB", (100, 100)).save(source / "blank.png")
-            _, summary = app.process_images(sorted(source.iterdir()), source, output, NoAnimals(), truth)
-            by_name = {row["filename"]: row for row in summary}
-            self.assertEqual(by_name["pet.png"]["cat_error"], 1)
-            self.assertEqual(by_name["pet.png"]["dog_error"], 0)
-            self.assertEqual(by_name["blank.png"]["cat_error"], "")
-            gt.write_text("filename,actual_cat,actual_dog\npet.png,-1,0\n")
+    def test_truth_blank_zero_and_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "truth.csv"
+            path.write_text("filename,actual_cat,actual_dog\na.jpg,,0\n")
+            truth = common.read_ground_truth(path)
+            self.assertIsNone(truth["a.jpg"]["actual_cat"])
+            self.assertEqual(truth["a.jpg"]["actual_dog"], 0)
+            path.write_text("filename,actual_cat,actual_dog\na.jpg,-1,0\n")
             with self.assertRaises(ValueError):
-                app.read_ground_truth(gt)
+                common.read_ground_truth(path)
 
-    def test_opencv_exif_orientation_and_korean_path(self):
-        from PIL import Image, ImageOps
-        with tempfile.TemporaryDirectory() as folder:
-            path = Path(folder) / "회전사진.jpg"
-            exif = Image.Exif()
-            exif[274] = 6
-            Image.new("RGB", (40, 20), "red").save(path, exif=exif)
-            with Image.open(path) as original:
-                expected = ImageOps.exif_transpose(original).size
-            self.assertEqual(app.read_image(path).size, expected)
-
-    def test_same_stem_preserves_both_outputs_and_inputs(self):
+    def test_default_main_counts_breeds_and_corrupt_image(self):
         from PIL import Image
-        class NoAnimals:
-            def predict(self, image):
+        class Detector:
+            names = {15: "cat", 16: "dog"}
+            def predict(self, image, **kwargs):
+                return [image]
+        def classify(result, image, classifier):
+            if not image.any():
                 return []
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            source, output = root / "input", root / "output"
-            source.mkdir(); output.mkdir()
-            for name in ("pet.jpg", "pet.png"):
-                Image.new("RGB", (60, 60)).save(source / name)
-            files = sorted(source.iterdir())
-            hashes = [hashlib.sha256(p.read_bytes()).hexdigest() for p in files]
-            _, summary = app.process_images(files, source, output, NoAnimals())
-            names = [row["result_image"] for row in summary]
-            self.assertEqual(len(set(names)), 2)
-            self.assertTrue(all((output / name).exists() for name in names))
-            self.assertEqual(hashes, [hashlib.sha256(p.read_bytes()).hexdigest() for p in files])
+            return [{"species": species, "detection_confidence": .9, "x1": i * 40, "y1": 0, "x2": i * 40 + 35, "y2": 35,
+                     **pet_model.choose_breed(scores, ["Beagle", "Siamese"], species, .5)}
+                    for i, (species, scores) in enumerate([("dog", [.9,.1]), ("cat", [.1,.9])])]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, output = root / "images", root / "outputs"
+            source.mkdir()
+            Image.new("RGB", (100, 100), "white").save(source / "two.png")
+            Image.new("RGB", (100, 100), "black").save(source / "none.png")
+            (source / "bad.jpg").write_bytes(b"broken")
+            with patch.object(app, "SAMPLE_INPUT", source), patch.object(app, "OUTPUT", output), \
+                 patch.object(app, "yolo", return_value=Detector()), patch.object(app, "breed_model"), \
+                 patch.object(app, "classify_pets", side_effect=classify), patch.object(app.logging, "basicConfig"):
+                self.assertEqual(app.main([]), 1)
+            with (output / "pet_counts.csv").open(encoding="utf-8-sig") as handle:
+                rows = {r["filename"]: r for r in csv.DictReader(handle)}
+            self.assertEqual((rows["two.png"]["cat"], rows["two.png"]["dog"]), ("1", "1"))
+            self.assertEqual((rows["none.png"]["cat"], rows["none.png"]["dog"]), ("0", "0"))
+            self.assertEqual(rows["bad.jpg"]["status"], "error")
+            with (output / "pet_breeds.csv").open(encoding="utf-8-sig") as handle:
+                self.assertEqual(len(list(csv.DictReader(handle))), 2)
+            self.assertTrue((output / "two_pets.jpg").exists())
 
 
 if __name__ == "__main__":

@@ -2,29 +2,12 @@
 설명할 함수: annotate, save_image, write_csv.
 실습: DOG_COLOR와 CAT_COLOR를 바꾸면 박스 색상이 바뀝니다.
 """
-import csv
 
 DOG_COLOR = (50, 210, 120)
 CAT_COLOR = (80, 180, 255)
-FIELDS = ["filename", "object_id", "species", "breed", "candidate_breed", "breed_confidence",
-          "detection_confidence", "status", "reason", "x1", "y1", "x2", "y2", "top3_json",
-          "result_image", "image_processing_ms"]
-SUMMARY_FIELDS = ["filename", "cat", "dog", "actual_cat", "actual_dog", "cat_error", "dog_error",
-                  "status", "animal_count", "processing_ms", "error", "result_image"]
-
-
 def animal_counts(predictions):
     return {"dog_count": sum(p["species"] == "dog" for p in predictions),
             "cat_count": sum(p["species"] == "cat" for p in predictions)}
-
-
-def write_csv(path, rows, fields):
-    temporary = path.with_suffix(".tmp.csv")
-    with temporary.open("w", encoding="utf-8-sig", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
-        writer.writeheader()
-        writer.writerows(rows)
-    temporary.replace(path)
 
 
 def annotate(image, predictions):
@@ -65,15 +48,3 @@ def annotate(image, predictions):
     canvas.paste(result, (0, header_height))
     ImageDraw.Draw(canvas).text((4, 6), title, font=title_font, fill="white")
     return canvas
-
-
-
-def save_image(image, destination):
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    import cv2
-    import numpy as np
-    bgr = cv2.cvtColor(np.asarray(image), cv2.COLOR_RGB2BGR)
-    success, encoded = cv2.imencode(destination.suffix, bgr)
-    if not success:
-        raise OSError(f"이미지 인코딩 실패: {destination}")
-    encoded.tofile(destination)

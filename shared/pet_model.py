@@ -1,10 +1,11 @@
 """AI 처리: 모델 다운로드 → 동물 탐지 → 크롭 → 37품종 분류."""
 import hashlib
-import math
-import os
 from pathlib import Path
 import tempfile
+import shutil
 import urllib.request
+
+MODEL_DIR = Path(__file__).resolve().parent / "models"
 
 DETECTION_CONFIDENCE = 0.25
 BREED_CONFIDENCE = 0.50
@@ -51,11 +52,22 @@ def download_verified(url, destination, expected_hash):
     return destination
 
 
-def prepare_models(model_dir):
-    model_dir = Path(model_dir)
-    detector = download_verified(YOLO_URL, model_dir / "yolo11n.pt", YOLO_SHA256)
-    classifier = download_verified(BREED_URL, model_dir / "oxford-pets-resnet50.pth", BREED_SHA256)
-    return detector, classifier
+def model_file(filename, url, checksum):
+    """기존 models 파일을 재사용하고, 모델은 shared/models에 모읍니다."""
+    destination = MODEL_DIR / filename
+    legacy = MODEL_DIR.parent.parent / "models" / filename
+    if not destination.exists() and legacy.is_file() and sha256(legacy) == checksum:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(legacy, destination)
+    return download_verified(url, destination, checksum)
+
+
+def prepare_models():
+    return (
+        model_file("yolo11n.pt", YOLO_URL, YOLO_SHA256),
+        model_file("oxford-pets-resnet50.pth", BREED_URL, BREED_SHA256),
+    )
+
 
 # 2. 품종 분류
 CAT_BREEDS = {"Abyssinian", "Bengal", "Birman", "Bombay", "British Shorthair",
@@ -111,47 +123,3 @@ class BreedClassifier:
             probabilities = self.classifier(tensor).softmax(dim=1)[0].tolist()
         return choose_breed(probabilities, self.classes, species, self.confidence)
 
-# 3. 개·고양이 탐지
-class PetDetector:
-    def __init__(self, weights_path, confidence=DETECTION_CONFIDENCE):
-        os.environ.setdefault("YOLO_CONFIG_DIR", str(Path(weights_path).parent / "ultralytics_settings"))
-        from ultralytics import YOLO
-        self.detector = YOLO(str(weights_path))
-        if self.detector.names.get(15) != "cat" or self.detector.names.get(16) != "dog":
-            raise ValueError("개/고양이 클래스가 있는 COCO 탐지 모델이 필요합니다.")
-        self.detection_conf = confidence
-
-    def detect(self, image):
-        import numpy as np
-        bgr = np.asarray(image)[:, :, ::-1].copy()
-        boxes = self.detector.predict(bgr, classes=[15, 16], conf=self.detection_conf,
-                                      device="cpu", imgsz=640, verbose=False)[0].boxes
-        detections = []
-        for box in boxes:
-            x1, y1, x2, y2 = box.xyxy[0].cpu().tolist()
-            bounds = (max(0, math.floor(x1)), max(0, math.floor(y1)),
-                      min(image.width, math.ceil(x2)), min(image.height, math.ceil(y2)))
-            if bounds[0] >= bounds[2] or bounds[1] >= bounds[3]:
-                continue
-            detections.append((bounds, "cat" if int(box.cls.item()) == 15 else "dog", float(box.conf.item())))
-        return [
-            {"species": species, "detection_confidence": score,
-             **dict(zip(("x1", "y1", "x2", "y2"), bounds))}
-            for bounds, species, score in sorted(detections, key=lambda item: item[0])
-        ]
-
-# 4. 탐지와 분류 연결
-class PetModel:
-    def __init__(self, model_dir, detection_conf=DETECTION_CONFIDENCE,
-                 breed_conf=BREED_CONFIDENCE):
-        detector_path, breed_path = prepare_models(model_dir)
-        self.detector = PetDetector(detector_path, detection_conf)
-        self.classifier = BreedClassifier(breed_path, breed_conf)
-
-    def predict(self, image):
-        results = []
-        for detection in self.detector.detect(image):
-            bounds = tuple(detection[key] for key in ("x1", "y1", "x2", "y2"))
-            breed = self.classifier.classify(image.crop(bounds), detection["species"])
-            results.append({**detection, **breed})
-        return results

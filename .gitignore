@@ -10,10 +10,13 @@ __pycache__/
 # Large datasets and personal photos
 data/oxford-iiit-pet/*
 data/my-photos/
-images.tar.gz
-annotations.tar.gz
+*.tar.gz
+*.tar
+data/oxford/
 
 # Downloaded models and generated results
+shared/models/*
+!shared/models/.gitkeep
 models/*
 !models/.gitkeep
 *.pt
