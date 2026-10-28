@@ -1,3 +1,4 @@
+# [설명] 제목 없는 5열 정답표를 읽어 개·고양이 실제 수를 평가 함수에 전달합니다.
 """수기 정답표 읽기: 제목 없는 5열 한국어 CSV와 이전 제목 포함 CSV를 지원합니다.
 
 새 형식(제목 행 없음): 파일명,동물 종류,고양이 수,개 수,장면 설명
@@ -7,6 +8,7 @@ from pathlib import Path
 import csv
 
 
+# [설명] 수기 정답을 읽고 파일명별 개·고양이 수만 평가용으로 반환합니다. 장면 메모는 AI가 읽지 않습니다.
 def read_ground_truth(path):
     path = Path(path)
     if not path.is_file():
@@ -20,6 +22,7 @@ def read_ground_truth(path):
     if not rows:
         return {}
 
+    # [설명] 현재 제목 없는 5열 형식과 예전 제목 포함 CSV를 둘 다 지원합니다.
     header = rows[0][1]
     has_header = header[0] == "filename"
     if has_header:
@@ -66,5 +69,6 @@ def read_ground_truth(path):
             if cat_count is not None and dog_count is not None and not known[kind](cat_count, dog_count):
                 raise ValueError(f"정답표 {name}: 동물 종류와 실제 개·고양이 수가 일치하지 않습니다.")
 
+        # [설명] 장면 특징은 사람용 메모일 뿐 AI의 추론·성능 계산에는 전달하지 않습니다.
         truth[name] = values
     return truth

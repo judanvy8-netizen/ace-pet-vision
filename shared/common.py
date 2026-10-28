@@ -1,3 +1,4 @@
+# [설명] main-3에서 부르는 사진 입력·탐지·중복 제거·저장 등의 공통 기능입니다.
 """기본 제공 main.py의 공통 함수 규격을 구현합니다.
 원본 shared/common.py는 제공되지 않아, 확인한 호출 규격을 기준으로 작성했습니다.
 """
@@ -25,6 +26,7 @@ BREED_FIELDS = ["filename", "object_id", "species", "breed", "candidate_breed",
                 "top3_species", "variant_diagnostics"]
 
 
+# [설명] 기본 탐지기: 사진 속 개·고양이 박스를 찾을 YOLO11n 모델을 불러옵니다.
 def yolo():
     os.environ.setdefault("YOLO_CONFIG_DIR", str(MODEL_DIR / "settings"))
     from ultralytics import YOLO
@@ -34,6 +36,7 @@ def yolo():
     return model
 
 
+# [설명] 추가 탐지기: 기본 YOLO가 0마리일 때만 YOLO11s로 재검사합니다.
 def yolo_rescue():
     """Extra YOLO11s detector loaded only for images with zero primary detections."""
     os.environ.setdefault("YOLO_CONFIG_DIR", str(MODEL_DIR / "settings"))
@@ -44,6 +47,7 @@ def yolo_rescue():
     return model
 
 
+# [설명] 마지막 탐지기: 앞선 재검사가 모두 실패했을 때 YOLO11m을 사용합니다.
 def yolo_strong():
     """More capable detector; load only if YOLO11n and YOLO11s both miss."""
     os.environ.setdefault("YOLO_CONFIG_DIR", str(MODEL_DIR / "settings"))
@@ -54,6 +58,7 @@ def yolo_strong():
     return model
 
 
+# [설명] 확대 재검사: 작은 개체를 놓쳤을 때 사진 일부를 검사하고 원본 좌표로 되돌립니다.
 def zoomed_pet_rescue(image, model, classifier, *, conf=0.07):
     """Run real YOLO detection on overlapping crops; restore original coordinates.
 
@@ -88,10 +93,12 @@ def zoomed_pet_rescue(image, model, classifier, *, conf=0.07):
     return []
 
 
+# [설명] 품종 모델 준비: YOLO가 찾은 개체의 품종을 Oxford 37종에서 추론합니다.
 def breed_model(confidence=BREED_CONFIDENCE):
     return BreedClassifier(model_file("oxford-pets-resnet50.pth", BREED_URL, BREED_SHA256), confidence)
 
 
+# [설명] 입력 목록: 한 장 또는 폴더의 이미지 파일을 찾아 순서대로 처리합니다.
 def image_files(source):
     source = Path(source)
     if source.is_file():
@@ -106,6 +113,7 @@ def image_files(source):
     return files
 
 
+# [설명] 사진 읽기: 한글 경로·회전 정보 등을 고려해 OpenCV 이미지로 불러옵니다.
 def read_image(path):
     image = cv2.imdecode(np.fromfile(path, dtype=np.uint8), cv2.IMREAD_COLOR)
     if image is None:
@@ -113,6 +121,7 @@ def read_image(path):
     return image
 
 
+# [설명] 결과 저장: 원본을 바꾸지 않고 박스가 그려진 사진을 저장합니다.
 def save_image(path, image):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -122,6 +131,7 @@ def save_image(path, image):
     encoded.tofile(path)
 
 
+# [설명] CSV 저장: Excel 한글 호환 BOM과 임시 파일 교체로 결과를 보관합니다.
 def save_csv(path, fields, rows):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -133,6 +143,7 @@ def save_csv(path, fields, rows):
     temporary.replace(path)
 
 
+# [설명] 중복 여부: 같은 종의 얼굴·몸통 박스가 겹치는 비율로 한 개체인지 판단합니다.
 def _same_animal_box(left, right):
     """Treat very similar or nested boxes of the same species as a duplicate.
 
@@ -152,11 +163,13 @@ def _same_animal_box(left, right):
     area_b = (bx2 - bx1) * (by2 - by1)
     if min(area_a, area_b) <= 0:
         return False
+    # [설명] 전신과 얼굴처럼 겹친 박스는 IoU와 작은 박스 포함률을 함께 확인합니다.
     iou = intersection / (area_a + area_b - intersection)
     small_coverage = intersection / min(area_a, area_b)
     return iou >= 0.55 or (small_coverage >= 0.90 and iou >= 0.25)
 
 
+# [설명] 중복 제거: 한 마리를 둘로 세지 않도록 겹친 박스 중 신뢰도 높은 후보를 남깁니다.
 def deduplicate_pets(predictions):
     """Keep the most credible breed prediction within each duplicate group."""
     ranked = sorted(
@@ -177,6 +190,7 @@ def deduplicate_pets(predictions):
 NON_TARGET_ANIMALS = {"bear", "sheep", "cow", "horse"}
 
 
+# [설명] 오분류 확인: 곰 등 다른 동물 라벨의 실제 박스를 품종 모델로 검토하되 REVIEW로 표시합니다.
 def classify_animal_proposals(result, image, classifier, *, min_breed_confidence=0.55):
     """Review a real YOLO animal box whose COCO label was not cat/dog.
 
@@ -187,6 +201,7 @@ def classify_animal_proposals(result, image, classifier, *, min_breed_confidence
     proposals = []
     for box in result.boxes:
         animal_label = result.names[int(box.cls.item())]
+        # [설명] 모든 사물을 품종 모델에 넣지 않고 곰·양·소·말 등 다른 동물만 검토합니다.
         if animal_label not in NON_TARGET_ANIMALS:
             continue
         a, b, c, d = box.xyxy[0].cpu().tolist()
@@ -212,6 +227,7 @@ def classify_animal_proposals(result, image, classifier, *, min_breed_confidence
     return deduplicate_pets(proposals)
 
 
+# [설명] 탐지→품종 연결: YOLO 동물 박스만 잘라 ResNet50으로 품종을 분류합니다.
 def classify_pets(result, image, classifier):
     """기본 YOLO 결과의 동물 영역을 잘라 추가 품종 모델에 전달합니다."""
     height, width = image.shape[:2]
@@ -236,14 +252,17 @@ def classify_pets(result, image, classifier):
         predictions.append({"species": species, "yolo_species": species, "yolo_label": species,
                             "detection_confidence": float(box.conf.item()),
                             "x1": x1, "y1": y1, "x2": x2, "y2": y2, **breed})
+    # [설명] 품종을 분류한 뒤 개수를 세기 전에 동일 개체의 중복 박스를 제거합니다.
     return deduplicate_pets(predictions)
 
 
+# [설명] 화면 표시: 개수·품종·박스를 표시하는 함수에 사진을 전달합니다.
 def draw_pets(image, predictions):
     rgb = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
     return cv2.cvtColor(np.asarray(annotate(rgb, predictions)), cv2.COLOR_RGB2BGR)
 
 
+# [설명] 파일 이름: 입력명에 맞는 결과 이미지 경로를 만들고 중복 이름을 피합니다.
 def result_path(relative, used):
     relative = Path(relative)
     path = relative.with_name(relative.stem + "_pets.jpg")
@@ -255,6 +274,7 @@ def result_path(relative, used):
     return path
 
 
+# [설명] 출처 연결: metadata.csv에서 원본 사진 URL을 읽어 결과 CSV에 남깁니다.
 def read_photo_sources(path):
     """Return original source-page URLs from metadata.csv, keyed by input filename.
 
@@ -277,6 +297,7 @@ def read_photo_sources(path):
     return sources
 
 
+# [설명] 수동 확인용: 사용자가 한 마리임을 확인했을 때만 품종을 추측하며 탐지 성공으로 세지 않습니다.
 def single_pet_review(image, classifier):
     """Explicit user-confirmed single-animal photo fallback; NOT YOLO detection.
 

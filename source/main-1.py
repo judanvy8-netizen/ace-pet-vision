@@ -1,3 +1,4 @@
+# [설명] 1단계: 기본 탐지에 37품종 분류와 수기 정답 개수 비교를 추가한 개선본입니다.
 # 이전 실제 커밋을 바탕으로 보존한 1단계 버전
 """기본 제공 05번 main.py 흐름에 품종 분류와 정답 비교를 추가했습니다."""
 from pathlib import Path
@@ -17,6 +18,7 @@ SAMPLE_INPUT = ROOT / "data" / "images"
 OUTPUT = ROOT / "outputs"
 
 
+# [설명] 0~1 사이의 신뢰도 기준값만 받도록 입력을 검사합니다.
 def probability(value):
     value = float(value)
     if not 0 <= value <= 1:
@@ -24,6 +26,7 @@ def probability(value):
     return value
 
 
+# [설명] 입력 선택→모델 추론→결과 저장→수기 정답 비교까지 전체 실행 흐름을 관리합니다.
 def main(argv=None):
     ap = argparse.ArgumentParser(description="개·고양이 마릿수와 품종 분석")
     default_input = SAMPLE_INPUT
@@ -51,6 +54,7 @@ def main(argv=None):
     input_root = source.parent if source.is_file() else source
     if output == input_root or input_root in output.parents:
         raise ValueError("outputs는 입력 폴더 바깥에 두세요.")
+    # [설명] 수기 정답은 모델에 알려주지 않고 추론이 끝난 뒤 개수 오차만 확인합니다.
     truth = read_ground_truth((ROOT / args.truth).resolve())
     output.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(filename=output / "errors.log", filemode="w", level=logging.ERROR, encoding="utf-8", force=True)
@@ -58,18 +62,22 @@ def main(argv=None):
     save_csv(output / "pet_counts.csv", COUNT_FIELDS, rows)
     save_csv(output / "pet_breeds.csv", BREED_FIELDS, breeds)
     print(f"입력: {source} / 처리: {len(files)}장", flush=True)
+    # [설명] YOLO 탐지와 ResNet 품종 분류에 사용할 모델을 준비합니다.
     model = yolo()
     classifier = breed_model(args.breed_conf)
     ids = [i for i, name in model.names.items() if name in TARGETS]
+    # [설명] 사진을 한 장씩 처리하여 파일별 오류·결과를 저장합니다.
     for index, path in enumerate(files, 1):
         filename = path.relative_to(input_root).as_posix()
         row = dict.fromkeys(COUNT_FIELDS, "")
         row.update(filename=filename, status="error")
         try:
             image = read_image(path)
+            # [설명] YOLO가 개체 박스를 찾고 바로 아래 품종 분류가 이 영역을 이용합니다.
             result = model.predict(image, classes=ids, conf=args.conf, device="cpu", verbose=False)[0]
             pets = classify_pets(result, image, classifier)
             counts = {name: sum(p["species"] == name for p in pets) for name in TARGETS}
+            # [설명] 원본은 보존하고 출력 폴더에 결과 사본을 저장합니다.
             target = result_path(filename, used)
             save_image(output / target, draw_pets(image, pets))
             row.update(**counts, status="ok" if pets else "no_detection", result_image=target.as_posix())
@@ -84,11 +92,13 @@ def main(argv=None):
             row["error"] = str(error)
             logging.exception("사진 처리 실패: %s", filename)
             print(f"[{index}/{len(files)}] {filename}: 처리 실패 — {error}", flush=True)
+        # [설명] 예측 수와 실제 수의 차이를 계산하고 비어 있는 정답은 건너뜁니다.
         for species in TARGETS:
             actual = truth.get(filename, {}).get("actual_" + species)
             row["actual_" + species] = actual if actual is not None else ""
             if actual is not None and row["status"] != "error":
                 row[species + "_error"] = abs(row[species] - actual)
+        # [설명] 매 사진이 끝날 때마다 CSV를 갱신해 중간 종료에도 결과를 남깁니다.
         rows.append(row)
         save_csv(output / "pet_counts.csv", COUNT_FIELDS, rows)
         save_csv(output / "pet_breeds.csv", BREED_FIELDS, breeds)

@@ -1,3 +1,4 @@
+# [설명] 2단계: 한 마리 중복 계산과 미탐지를 줄이려고 박스 병합·YOLO11s를 더했습니다.
 # 이전 실제 커밋을 바탕으로 보존한 2단계 버전
 """기본 제공 05번 main.py 흐름에 품종 분류와 정답 비교를 추가했습니다."""
 from pathlib import Path
@@ -17,6 +18,7 @@ SAMPLE_INPUT = ROOT / "data" / "images"
 OUTPUT = ROOT / "outputs"
 
 
+# [설명] 0~1 사이의 신뢰도 기준값만 받도록 입력을 검사합니다.
 def probability(value):
     value = float(value)
     if not 0 <= value <= 1:
@@ -24,6 +26,7 @@ def probability(value):
     return value
 
 
+# [설명] 입력 선택→모델 추론→결과 저장→수기 정답 비교까지 전체 실행 흐름을 관리합니다.
 def main(argv=None):
     ap = argparse.ArgumentParser(description="개·고양이 마릿수와 품종 분석")
     default_input = SAMPLE_INPUT
@@ -54,10 +57,12 @@ def main(argv=None):
     input_root = source.parent if source.is_file() else source
     if output == input_root or input_root in output.parents:
         raise ValueError("outputs는 입력 폴더 바깥에 두세요.")
+    # [설명] 수기 정답은 AI 판단에 쓰지 않고 추론 후 평가할 때만 사용합니다.
     truth = read_ground_truth((ROOT / args.truth).resolve())
     print(f"입력: {source} / 처리: {len(files)}장", flush=True)
     # 필수 기능(개·고양이 탐지 + 37품종 분류)을 먼저 준비합니다.
     # 모델이 없거나 손상되어 실행에 실패하면 기존 CSV를 지우지 않습니다.
+    # [설명] 모델 준비가 실패해도 이전 CSV를 지우지 않게 모델을 먼저 로드합니다.
     model = yolo()
     classifier = breed_model(args.breed_conf)
     ids = [i for i, name in model.names.items() if name in TARGETS]
@@ -69,6 +74,7 @@ def main(argv=None):
     save_csv(output / "pet_counts.csv", COUNT_FIELDS, rows)
     save_csv(output / "pet_breeds.csv", BREED_FIELDS, breeds)
     rescue_model = None  # Load the larger detector only if a photo needs rescue.
+    # [설명] 기본 탐지에 실패한 사진만 추가 검사하며 파일별 결과를 기록합니다.
     for index, path in enumerate(files, 1):
         filename = path.relative_to(input_root).as_posix()
         row = dict.fromkeys(COUNT_FIELDS, "")
@@ -79,6 +85,7 @@ def main(argv=None):
                                    imgsz=640, device="cpu", verbose=False)[0]
             pets = classify_pets(result, image, classifier)
             detector_name = "yolo11n"
+            # [설명] 기본 YOLO가 0마리일 때만 큰 YOLO11s를 호출해 CPU 부담을 줄입니다.
             if not pets and not args.no_rescue:
                 # Do not fabricate a pet; attempt another actual object detection.
                 if rescue_model is None:
@@ -93,6 +100,7 @@ def main(argv=None):
                 pets = classify_pets(rescue_result, image, classifier)
                 detector_name = "yolo11s_rescue"
             counts = {name: sum(p["species"] == name for p in pets) for name in TARGETS}
+            # [설명] 중복 제거된 개체 목록으로 결과 이미지·마릿수를 기록합니다.
             target = result_path(filename, used)
             save_image(output / target, draw_pets(image, pets))
             row.update(**counts, status="ok" if pets else "no_detection", detector=detector_name,
@@ -109,6 +117,7 @@ def main(argv=None):
             row["error"] = str(error)
             logging.exception("사진 처리 실패: %s", filename)
             print(f"[{index}/{len(files)}] {filename}: 처리 실패 — {error}", flush=True)
+        # [설명] 사람이 확인한 정답 개수와 탐지 개수의 오차를 계산합니다.
         for species in TARGETS:
             actual = truth.get(filename, {}).get("actual_" + species)
             row["actual_" + species] = actual if actual is not None else ""

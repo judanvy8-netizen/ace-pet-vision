@@ -1,3 +1,4 @@
+# [설명] 원본 사본에 탐지 박스·개수·품종 후보를 표시합니다.
 """출력 담당: 동물 박스·품종 표시, 이미지와 CSV 저장.
 설명할 함수: annotate, save_image, write_csv.
 실습: DOG_COLOR와 CAT_COLOR를 바꾸면 박스 색상이 바뀝니다.
@@ -5,11 +6,13 @@
 
 DOG_COLOR = (50, 210, 120)
 CAT_COLOR = (80, 180, 255)
+# [설명] 최종 개·고양이 수를 세어 화면 상단에 표시할 값을 만듭니다.
 def animal_counts(predictions):
     return {"dog_count": sum(p["species"] == "dog" for p in predictions),
             "cat_count": sum(p["species"] == "cat" for p in predictions)}
 
 
+# [설명] 개체별 박스·품종·신뢰도·검토 사유를 결과 이미지에 그립니다.
 def annotate(image, predictions):
     from PIL import Image, ImageDraw, ImageFont
     result = image.copy()
@@ -21,6 +24,7 @@ def annotate(image, predictions):
         color = DOG_COLOR if prediction["species"] == "dog" else CAT_COLOR
         draw.rectangle((x1, y1, x2 - 1, y2 - 1), outline=color, width=max(2, round(image.width / 500)))
         label = f'#{number} {prediction["species"]}: {prediction["breed"]} {prediction["breed_confidence"]:.0%}'
+        # [설명] 모델 간 충돌·낮은 점수 등은 확정 분류처럼 보이지 않도록 검토 사유를 표시합니다.
         if prediction["status"] == "review":
             reason = prediction.get("reason", "")
             if reason == "species_corrected_high_confidence":

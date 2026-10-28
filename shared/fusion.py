@@ -1,4 +1,6 @@
+# [설명] YOLO와 ResNet의 종 판단을 비교해 교정 여부를 결정합니다.
 """Reconcile YOLO species with 37-breed softmax, without inventing probabilities."""
+# [설명] YOLO의 종과 ResNet의 품종이 충돌할 때 강한 근거가 있어야 종을 고치고 REVIEW로 남깁니다.
 def choose_supported_breed(probabilities, classes, yolo_species, threshold, cat_breeds,
                            override_threshold=0.85, mass_threshold=0.90):
     if yolo_species not in ("cat", "dog"):
@@ -15,12 +17,14 @@ def choose_supported_breed(probabilities, classes, yolo_species, threshold, cat_
     dog_mass = sum(scores) - cat_mass
     top_mass = cat_mass if top_species == "cat" else dog_mass
     species = yolo_species
+    # [설명] 반대 종 1위 점수 85%·해당 종 전체 90% 이상일 때만 종을 교정합니다.
     if (top_species != yolo_species and scores[best] >= override_threshold
             and top_mass >= mass_threshold):
         species = top_species
         chosen = best
         reason = "species_corrected_high_confidence"
     else:
+        # [설명] 교정 근거가 부족하면 YOLO 종을 유지하고 그 종의 품종을 고릅니다.
         allowed = [i for i in idx
                    if ("cat" if classes[i] in cat_breeds else "dog") == yolo_species]
         if not allowed:

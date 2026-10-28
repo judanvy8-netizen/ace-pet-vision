@@ -1,3 +1,4 @@
+# [설명] ResNet50 모델 파일 관리·Oxford 37품종 점수 계산을 담당합니다.
 """AI 처리: 모델 다운로드 → 동물 탐지 → 크롭 → 37품종 분류."""
 import hashlib
 from pathlib import Path
@@ -23,6 +24,7 @@ YOLO_S_SHA256 = "85a76fe86dd8afe384648546b56a7a78580c7cb7b404fc595f97969322d502d
 # Ultralytics/assets v8.4.0 official GitHub release digest.
 YOLO_M_URL = "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo11m.pt"
 YOLO_M_SHA256 = "d5ffc1a674953a08e11a8d21e022781b1b23a19b730afc309290bd9fb5305b95"
+# [설명] 모델 무결성: 저장된 AI 가중치의 SHA-256을 구해 파일 손상을 검사합니다.
 def sha256(path):
     digest = hashlib.sha256()
     with Path(path).open("rb") as handle:
@@ -31,6 +33,7 @@ def sha256(path):
     return digest.hexdigest()
 
 
+# [설명] 안전한 다운로드: 해시 검증을 통과한 사전학습 가중치만 설치합니다.
 def download_verified(url, destination, expected_hash):
     """가중치를 검증한 뒤 원자적으로 교체. 손상된 다운로드를 모델로 읽지 않습니다."""
     destination = Path(destination)
@@ -59,6 +62,7 @@ def download_verified(url, destination, expected_hash):
     return destination
 
 
+# [설명] 모델 위치: 이미 다운로드한 가중치는 재사용하고 없을 때만 받습니다.
 def model_file(filename, url, checksum):
     """기존 models 파일을 재사용하고, 모델은 shared/models에 모읍니다."""
     destination = MODEL_DIR / filename
@@ -69,6 +73,7 @@ def model_file(filename, url, checksum):
     return download_verified(url, destination, checksum)
 
 
+# [설명] 초기 준비: 필요한 모델을 내려받고 미리 검증할 때 사용합니다.
 def prepare_models():
     return (
         model_file("yolo11n.pt", YOLO_URL, YOLO_SHA256),
@@ -92,6 +97,7 @@ EXPECTED_CLASSES = (
 )
 
 
+# [설명] 이전 방식의 품종 후보 선택: 종 불일치·낮은 점수를 검토 대상으로 남깁니다.
 def choose_breed(probabilities, classes, species, threshold):
     """37개 전체 softmax 값을 사용하며, 종별 재정규화를 하지 않습니다."""
     order = sorted(range(len(classes)), key=lambda i: float(probabilities[i]), reverse=True)
@@ -105,7 +111,9 @@ def choose_breed(probabilities, classes, species, threshold):
 
 
 
+# [설명] 품종 분류 담당 클래스: YOLO 박스에서 잘라낸 사진을 ResNet50에 입력합니다.
 class BreedClassifier:
+    # [설명] 모델 로딩: 37품종 목록과 가중치가 올바른지 확인하고 추론 모드로 바꿉니다.
     def __init__(self, weights_path, confidence=BREED_CONFIDENCE):
         import torch
         from torchvision import models, transforms
@@ -123,21 +131,25 @@ class BreedClassifier:
         self.classifier.load_state_dict(checkpoint["model_state"], strict=True)
         self.classifier.eval()
         # 제공자가 학습/추론 예제에 명시한 전처리와 동일합니다.
+        # [설명] 학습 모델이 기대하는 입력 크기·정규화로 사진을 변환합니다.
         self.transform = transforms.Compose([
             transforms.Resize((224, 224)), transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])
         self.confidence = confidence
 
+    # [설명] 품종 점수: 사진 한 장에서 37종별 softmax 점수를 계산합니다.
     def _probabilities(self, crop):
         import torch
         tensor = self.transform(crop).unsqueeze(0)
         with torch.inference_mode():
             return self.classifier(tensor).softmax(dim=1)[0].tolist()
 
+    # [설명] 품종 분류 호출: YOLO 종 정보를 이용해 품종 후보를 반환합니다.
     def classify(self, crop, species):
         return self.classify_with_context(crop, species)
 
+    # [설명] 비율 보존: 가로로 긴 얼굴 사진이 찌그러지지 않도록 여백을 넣습니다.
     @staticmethod
     def _aspect_preserved_view(crop):
         """가로·세로가 긴 동물 사진을 정사각형으로 찌그러뜨리지 않고 채웁니다."""
@@ -147,6 +159,7 @@ class BreedClassifier:
         return ImageOps.pad(crop.convert("RGB"), (224, 224),
                             method=Image.Resampling.BILINEAR, color=fill)
 
+    # [설명] 불확실성 보완: 원본·좌우반전·주변영역·비율유지 관점의 점수를 비교합니다.
     def classify_with_context(self, crop, species, context=None):
         primary = self._probabilities(crop)
         outcome = choose_supported_breed(primary, self.classes, species, self.confidence, CAT_BREEDS)
@@ -155,6 +168,7 @@ class BreedClassifier:
         outcome["tta_used"] = False
         outcome["variant_diagnostics"] = f"원본:{initial_top} {initial_confidence:.1%}"
         # 기존에 높은 신뢰도로 판단된 결과(16/19번 포함)는 훼손하지 않습니다.
+        # [설명] 충분히 확실한 품종은 추가 추론 없이 그대로 사용합니다.
         if outcome["reason"] not in ("low_confidence", "species_conflict"):
             outcome["initial_top_breed"] = initial_top
             outcome["initial_top_confidence"] = initial_confidence
@@ -169,12 +183,14 @@ class BreedClassifier:
         if min(crop.size) and max(crop.size) / min(crop.size) >= 1.4:
             variants.append(("비율유지", self._probabilities(self._aspect_preserved_view(crop))))
 
+        # [설명] 추가 관점들의 점수를 평균하며 임의로 특정 품종을 정답 처리하지 않습니다.
         averaged = [sum(probs[i] for _, probs in variants) / len(variants)
                     for i in range(len(primary))]
         outcome = choose_supported_breed(averaged, self.classes, species, self.confidence, CAT_BREEDS)
         outcome["tta_used"] = len(variants) > 1
         outcome["initial_top_breed"] = initial_top
         outcome["initial_top_confidence"] = initial_confidence
+        # [설명] 진단 기록: 각 사진 관점에서 나온 1위 품종과 점수를 문자열로 정리합니다.
         def variant_summary(name, probs):
             idx = max(range(len(probs)), key=lambda i: probs[i])
             return f"{name}:{self.classes[idx]} {probs[idx]:.1%}"
@@ -182,6 +198,7 @@ class BreedClassifier:
             variant_summary(name, probs) for name, probs in variants)
         return outcome
 
+    # [설명] 탐지 실패 시 검토용 품종 가설: 사람이 한 마리라고 확인한 경우만 사용합니다.
     def classify_single_pet(self, crop):
         """Breed-only hypothesis for a photo the USER says has exactly one pet.
 

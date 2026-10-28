@@ -1,3 +1,4 @@
+# [설명] 추론 결과와 수기 정답을 비교해 정확도·REVIEW 지표를 별도로 기록합니다.
 """ACE 실행 결과 검증: 수작업 정답, REVIEW, 출처 라벨을 분리합니다."""
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -13,10 +14,12 @@ DETAIL_FIELDS = [
 ]
 
 
+# [설명] 서로 다른 띄어쓰기·대소문자의 품종 표기를 같은 방식으로 비교합니다.
 def _normalize_breed(value):
     return re.sub(r"[^a-z0-9]", "", str(value or "").lower())
 
 
+# [설명] 출처에 적힌 품종은 참고 표기이며 사람이 확인한 정답과 구별합니다.
 def _source_labels(path):
     path = Path(path)
     if not path.is_file():
@@ -29,6 +32,7 @@ def _source_labels(path):
                 for row in reader if (row.get("filename") or "").strip()}
 
 
+# [설명] 수기 정답 빈칸은 0마리가 아니라 아직 확인되지 않은 값으로 다룹니다.
 def _as_optional_int(value):
     if value is None or value == "":
         return None
@@ -40,6 +44,7 @@ def _as_optional_int(value):
     return result
 
 
+# [설명] 수기 정답과 예측 수를 비교하고 일반 탐지와 REVIEW 보정 결과를 따로 집계합니다.
 def summarize_evaluation(count_rows, breed_rows, ground_truth, metadata_path):
     """Count metrics require confirmed truth; source labels are ONLY references."""
     metadata = _source_labels(metadata_path)
@@ -64,6 +69,7 @@ def summarize_evaluation(count_rows, breed_rows, ground_truth, metadata_path):
             stats["review"] += 1
 
         count_error = ""
+        # [설명] 오류·REVIEW는 일반 탐지 지표에서 제외해 평가 수치를 부풀리지 않습니다.
         if status in ("error", "partial_error"):
             check = "처리 오류(평가 제외)"
         elif status.startswith("review"):
@@ -86,6 +92,7 @@ def summarize_evaluation(count_rows, breed_rows, ground_truth, metadata_path):
         # A genuine YOLO box reclassified via ResNet can be evaluated here, but
         # the explicit human-assumed "review_only" mode must NOT inflate results.
         final_error = ""
+        # [설명] 교차 모델 최종 개수 일치율에는 실제 박스가 있는 REVIEW를 따로 포함합니다.
         if status in ("ok", "no_detection", "review_detection", "review_species") and known \
                 and pred_cat is not None and pred_dog is not None:
             stats["final_count_scored"] += 1
@@ -102,6 +109,7 @@ def summarize_evaluation(count_rows, breed_rows, ground_truth, metadata_path):
         else:
             final_check = "최종 개수 평가 제외"
 
+        # [설명] 출처의 품종명은 참고 표기이며 수기 개수 정답과 구분합니다.
         source = metadata.get(filename, {})
         source_breed = (source.get("label") or "").strip()
         source_species = (source.get("species") or "").strip()
@@ -141,6 +149,7 @@ def summarize_evaluation(count_rows, breed_rows, ground_truth, metadata_path):
     return diagnostics, stats
 
 
+# [설명] 평가 결과를 한글 Excel에서도 읽을 수 있는 상세 CSV로 저장합니다.
 def _write_csv(path, rows):
     temporary = path.with_name(path.name + ".tmp")
     with temporary.open("w", encoding="utf-8-sig", newline="") as handle:
@@ -150,6 +159,7 @@ def _write_csv(path, rows):
     temporary.replace(path)
 
 
+# [설명] main-3 종료 후 검증_상세.csv와 검증_요약.md를 자동 생성합니다.
 def write_evaluation(count_rows, breed_rows, ground_truth, metadata_path, output_dir):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
