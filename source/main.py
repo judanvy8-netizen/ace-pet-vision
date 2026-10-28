@@ -157,18 +157,24 @@ def main(argv=None):
             result_status = ("review_only" if detector_name == "resnet_single_pet_review"
                              else "review_detection" if any(
                                  p.get("reason", "").startswith("other_animal_class:") for p in pets)
+                             else "review_species" if any(
+                                 p.get("reason") == "species_corrected_high_confidence" for p in pets)
                              else "partial_error" if row["error"] and not pets
                              else "ok" if pets else "no_detection")
             row.update(**counts, status=result_status, detector=detector_name,
                        result_image=target.as_posix())
             for number, pet in enumerate(pets, 1):
                 record = {"filename": filename, "object_id": number, **pet}
-                breeds.append({key: record[key] for key in BREED_FIELDS})
+                breeds.append({key: record.get(key, "") for key in BREED_FIELDS})
             print(f'[{index}/{len(files)}] {filename}: 개 {counts["dog"]}마리 / 고양이 {counts["cat"]}마리 '
                   f'({detector_name})', flush=True)
             for pet in pets:
-                label = pet["breed"] if pet["status"] == "classified" else f'{pet["candidate_breed"]} (보류)'
-                print(f'  {pet["species"]}: {label} / 후보 점수 {pet["breed_confidence"]:.1%}')
+                label = pet["breed"] if pet["status"] == "classified" else f'{pet["candidate_breed"]} (검토)'
+                print(f'  최종={pet["species"]} {label} {pet["breed_confidence"]:.1%} | '
+                      f'YOLO={pet.get("yolo_label", "?")} {pet["detection_confidence"]:.1%} | '
+                      f'ResNet1위={pet.get("resnet_top_breed", pet["candidate_breed"])} '
+                      f'{pet.get("resnet_top_confidence", pet["breed_confidence"]):.1%} '
+                      f'| 판단={pet.get("reason", "-") or "일치"}')
         except Exception as error:
             row["error"] = str(error)
             logging.exception("사진 처리 실패: %s", filename)
