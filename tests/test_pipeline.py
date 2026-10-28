@@ -204,6 +204,94 @@ class PipelineTests(unittest.TestCase):
                  patch.object(app, "breed_model"), patch.object(app, "classify_pets", side_effect=classify):
                 self.assertEqual(app.main(["--no-rescue"]), 0)
 
+    def test_photo_source_metadata_mapping(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "metadata.csv"
+            source.write_text(
+                "filename,source_page,license\n"
+                "16_dog_samoyed.jpg,https://commons.wikimedia.org/wiki/File:BeachDog2.jpg,PD\n"
+                "no_link.jpg,,\n"
+                "danger.jpg,=HYPERLINK(\"bad\"),\n", encoding="utf-8-sig")
+            result = common.read_photo_sources(source)
+            self.assertEqual(result["16_dog_samoyed.jpg"],
+                             "https://commons.wikimedia.org/wiki/File:BeachDog2.jpg")
+            self.assertEqual(result["no_link.jpg"], "")
+            self.assertEqual(result["danger.jpg"], "")
+            self.assertEqual(common.read_photo_sources(Path(directory)/"absent.csv"), {})
+
+    def test_single_pet_review_does_not_claim_yolo_detection(self):
+        from PIL import Image
+        from types import SimpleNamespace
+        class EmptyDetector:
+            names = {15: "cat", 16: "dog"}
+            def predict(self, image, **kwargs):
+                return [SimpleNamespace(names=self.names, boxes=[])]
+        class BreedOnly:
+            def classify_single_pet(self, crop):
+                self.size = crop.size
+                return dict(species="cat", breed="unknown", candidate_breed="Sphynx",
+                            breed_confidence=.62, status="review",
+                            reason="single_pet_assumed_not_yolo_detected")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, output = root/"images", root/"outputs"
+            source.mkdir()
+            Image.new("RGB", (80, 100), "blue").save(source/"19_cat_sphynx.jpg")
+            breed = BreedOnly()
+            with patch.object(app, "SAMPLE_INPUT", source), patch.object(app, "OUTPUT", output), \
+                 patch.object(app, "yolo", return_value=EmptyDetector()), \
+                 patch.object(app, "yolo_rescue", return_value=EmptyDetector()), \
+                 patch.object(app, "breed_model", return_value=breed):
+                self.assertEqual(app.main(["--single-pet-review"]), 0)
+            self.assertEqual(breed.size, (80, 100))
+            with (output/"pet_counts.csv").open(encoding="utf-8-sig") as handle:
+                row = list(csv.DictReader(handle))[0]
+            self.assertEqual((row["cat"], row["dog"]), ("1", "0"))
+            self.assertEqual(row["status"], "review_only")
+            self.assertEqual(row["detector"], "resnet_single_pet_review")
+            self.assertEqual(row["cat_error"], "")
+            with (output/"pet_breeds.csv").open(encoding="utf-8-sig") as handle:
+                breed_row = list(csv.DictReader(handle))[0]
+            self.assertEqual(breed_row["status"], "review")
+            self.assertEqual(breed_row["reason"], "single_pet_assumed_not_yolo_detected")
+
+    def test_deep_rescue_uses_tta_only_after_standard_rescue(self):
+        from PIL import Image
+        from types import SimpleNamespace
+        class FakeDetector:
+            names = {15: "cat", 16: "dog"}
+            def __init__(self): self.calls = []
+            def predict(self, image, **kwargs):
+                self.calls.append(kwargs)
+                return [SimpleNamespace(names=self.names,
+                    boxes=[1] if kwargs.get("augment", False) else [])]
+        def classify(result, image, classifier):
+            if not result.boxes: return []
+            return [dict(species="dog", breed="Samoyed", candidate_breed="Samoyed",
+                         breed_confidence=.8, detection_confidence=.2, status="classified",
+                         reason="", x1=5, y1=10, x2=60, y2=55)]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, output = root/"images", root/"outputs"
+            source.mkdir()
+            Image.new("RGB", (80, 60), "white").save(source/"dog.jpg")
+            primary,rescue=FakeDetector(),FakeDetector()
+            with patch.object(app, "SAMPLE_INPUT", source), patch.object(app, "OUTPUT", output), \
+                 patch.object(app, "yolo", return_value=primary), \
+                 patch.object(app, "yolo_rescue", return_value=rescue), \
+                 patch.object(app, "breed_model"), patch.object(app, "classify_pets", side_effect=classify):
+                self.assertEqual(app.main(["--deep-rescue"]), 0)
+            self.assertEqual(len(primary.calls), 1)
+            self.assertEqual(len(rescue.calls), 2)
+            self.assertEqual(rescue.calls[0]["imgsz"], 960)
+            self.assertEqual(rescue.calls[1]["imgsz"], 1280)
+            self.assertTrue(rescue.calls[1]["augment"])
+            self.assertEqual(rescue.calls[1]["conf"], .06)
+            with (output/"pet_counts.csv").open(encoding="utf-8-sig") as handle:
+                row = list(csv.DictReader(handle))[0]
+            self.assertEqual(row["dog"], "1")
+            self.assertEqual(row["detector"], "yolo11s_tta")
+
     def test_default_main_counts_breeds_and_corrupt_image(self):
         from PIL import Image
         class Detector:

@@ -38,6 +38,8 @@ def annotate(image, predictions):
     # 원본 위에 여백을 추가하여 동물을 가리지 않고 사진별 마릿수를 표시합니다.
     counts = animal_counts(predictions)
     title = f'Dogs: {counts["dog_count"]}  |  Cats: {counts["cat_count"]}'
+    if any(p.get("reason") == "single_pet_assumed_not_yolo_detected" for p in predictions):
+        title += "  |  REVIEW: NOT YOLO DETECTED"
     title_size = max(8, min(28, image.width // 12))
     title_font = ImageFont.load_default(size=title_size)
     while draw.textbbox((0, 0), title, font=title_font)[2] > image.width - 8 and title_size > 1:

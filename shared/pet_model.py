@@ -124,10 +124,26 @@ class BreedClassifier:
         ])
         self.confidence = confidence
 
-    def classify(self, crop, species):
+    def _probabilities(self, crop):
         import torch
         tensor = self.transform(crop).unsqueeze(0)
         with torch.inference_mode():
-            probabilities = self.classifier(tensor).softmax(dim=1)[0].tolist()
-        return choose_breed(probabilities, self.classes, species, self.confidence)
+            return self.classifier(tensor).softmax(dim=1)[0].tolist()
+
+    def classify(self, crop, species):
+        return choose_breed(self._probabilities(crop), self.classes, species, self.confidence)
+
+    def classify_single_pet(self, crop):
+        """Breed-only hypothesis for a photo the USER says has exactly one pet.
+
+        This is closed-set image classification, not an object-detection result.
+        Therefore the prediction is always marked for human review.
+        """
+        probabilities = self._probabilities(crop)
+        best = max(range(len(self.classes)), key=lambda i: probabilities[i])
+        species = "cat" if self.classes[best] in CAT_BREEDS else "dog"
+        outcome = choose_breed(probabilities, self.classes, species, self.confidence)
+        outcome.update(breed="unknown", status="review",
+                       reason="single_pet_assumed_not_yolo_detected")
+        return {"species": species, **outcome}
 

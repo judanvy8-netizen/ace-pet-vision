@@ -8,7 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from shared.common import (yolo, image_files, read_image, save_image, save_csv,
                            breed_model, yolo_rescue, classify_pets, draw_pets, result_path,
-                           read_ground_truth, COUNT_FIELDS, BREED_FIELDS)
+                           read_ground_truth, read_photo_sources, single_pet_review,
+                           COUNT_FIELDS, BREED_FIELDS)
 from shared.pet_model import prepare_models
 
 TARGETS = ("cat", "dog")
@@ -35,8 +36,14 @@ def main(argv=None):
     ap.add_argument("--no-rescue", action="store_true", help="미탐지 시 YOLO11s 재검사 끄기")
     ap.add_argument("--rescue-conf", type=probability, default=0.18,
                     help="미탐지 재검사의 탐지 신뢰도 기준 (기본 0.18)")
+    ap.add_argument("--deep-rescue", action="store_true",
+                    help="재검사도 실패하면 YOLO11s 고해상도+TTA로 한 번 더 검사 (CPU 느림)")
+    ap.add_argument("--single-pet-review", action="store_true",
+                    help="동물이 반드시 1마리라는 사람이 확인한 사진에서만 사용: 검출 실패 시 품종만 추정해 검토용으로 기록")
     ap.add_argument("--limit", type=int, default=20, help="처음 20장; 0이면 전체")
     ap.add_argument("--truth", type=Path, default=ROOT / "data" / "ground_truth.csv")
+    ap.add_argument("--metadata", type=Path, default=ROOT / "data" / "metadata.csv",
+                    help="출처 링크를 읽을 CSV (기본 data/metadata.csv)")
     ap.add_argument("--prepare-models", action="store_true")
     args = ap.parse_args(argv)
     if args.limit < 0:
@@ -54,6 +61,7 @@ def main(argv=None):
     if output == input_root or input_root in output.parents:
         raise ValueError("outputs는 입력 폴더 바깥에 두세요.")
     truth = read_ground_truth((ROOT / args.truth).resolve())
+    sources = read_photo_sources((ROOT / args.metadata).resolve())
     print(f"입력: {source} / 처리: {len(files)}장", flush=True)
     # 필수 기능(개·고양이 탐지 + 37품종 분류)을 먼저 준비합니다.
     # 모델이 없거나 손상되어 실행에 실패하면 기존 CSV를 지우지 않습니다.
@@ -71,7 +79,7 @@ def main(argv=None):
     for index, path in enumerate(files, 1):
         filename = path.relative_to(input_root).as_posix()
         row = dict.fromkeys(COUNT_FIELDS, "")
-        row.update(filename=filename, status="error")
+        row.update(filename=filename, status="error", source_url=sources.get(filename, ""))
         try:
             image = read_image(path)
             result = model.predict(image, classes=ids, conf=args.conf, iou=0.45,
@@ -91,10 +99,26 @@ def main(argv=None):
                 )[0]
                 pets = classify_pets(rescue_result, image, classifier)
                 detector_name = "yolo11s_rescue"
+                if not pets and args.deep_rescue:
+                    # Higher resolution and test-time augmentation may recover
+                    # difficult poses; confidence is lower, so REVIEW results.
+                    deep_result = rescue_model.predict(
+                        image, classes=rescue_ids, conf=0.06, iou=0.45,
+                        imgsz=1280, augment=True, device="cpu", verbose=False,
+                    )[0]
+                    pets = classify_pets(deep_result, image, classifier)
+                    detector_name = "yolo11s_tta"
+            if not pets and args.single_pet_review:
+                # The user explicitly confirms exactly one animal in this photo.
+                # This is NOT a detected box, and must not be scored as detection.
+                pets = single_pet_review(image, classifier)
+                detector_name = "resnet_single_pet_review"
             counts = {name: sum(p["species"] == name for p in pets) for name in TARGETS}
             target = result_path(filename, used)
             save_image(output / target, draw_pets(image, pets))
-            row.update(**counts, status="ok" if pets else "no_detection", detector=detector_name,
+            result_status = "review_only" if detector_name == "resnet_single_pet_review" else (
+                "ok" if pets else "no_detection")
+            row.update(**counts, status=result_status, detector=detector_name,
                        result_image=target.as_posix())
             for number, pet in enumerate(pets, 1):
                 record = {"filename": filename, "object_id": number, **pet}
@@ -111,7 +135,7 @@ def main(argv=None):
         for species in TARGETS:
             actual = truth.get(filename, {}).get("actual_" + species)
             row["actual_" + species] = actual if actual is not None else ""
-            if actual is not None and row["status"] != "error":
+            if actual is not None and row["status"] in ("ok", "no_detection"):
                 row[species + "_error"] = abs(row[species] - actual)
         rows.append(row)
         save_csv(output / "pet_counts.csv", COUNT_FIELDS, rows)

@@ -14,7 +14,7 @@ from .visualizer import annotate
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
 COUNT_FIELDS = ["filename", "cat", "dog", "actual_cat", "actual_dog",
-                "cat_error", "dog_error", "status", "detector", "error", "result_image"]
+                "cat_error", "dog_error", "status", "detector", "source_url", "error", "result_image"]
 BREED_FIELDS = ["filename", "object_id", "species", "breed", "candidate_breed",
                 "breed_confidence", "detection_confidence", "status", "reason",
                 "x1", "y1", "x2", "y2"]
@@ -156,6 +156,40 @@ def result_path(relative, used):
         number += 1
     used.add(path.as_posix().casefold())
     return path
+
+
+def read_photo_sources(path):
+    """Return original source-page URLs from metadata.csv, keyed by input filename.
+
+    Photos not present in the metadata deliberately get an empty source field;
+    this program never invents a copyright or attribution claim.
+    """
+    path = Path(path)
+    if not path.is_file():
+        return {}
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        if not {"filename", "source_page"}.issubset(reader.fieldnames or []):
+            raise ValueError("사진 출처표에 filename, source_page 열이 필요합니다.")
+        sources = {}
+        for row in reader:
+            filename = (row["filename"] or "").strip().replace("\\", "/")
+            source_url = (row["source_page"] or "").strip()
+            if filename and filename not in sources:
+                sources[filename] = source_url if source_url.startswith(("https://", "http://")) else ""
+    return sources
+
+
+def single_pet_review(image, classifier):
+    """Explicit user-confirmed single-animal photo fallback; NOT YOLO detection.
+
+    Never call this automatically on unknown or no-animal photos.
+    """
+    height, width = image.shape[:2]
+    rgb = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    prediction = classifier.classify_single_pet(rgb)
+    return [{"x1": 0, "y1": 0, "x2": width, "y2": height,
+             "detection_confidence": 0.0, **prediction}]
 
 
 def read_ground_truth(path):
