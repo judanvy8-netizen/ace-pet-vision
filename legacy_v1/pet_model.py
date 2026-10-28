@@ -5,7 +5,8 @@ import tempfile
 import shutil
 import urllib.request
 
-MODEL_DIR = Path(__file__).resolve().parent / "models"
+# 이전 단계도 현재 프로젝트와 같은 검증된 모델 가중치 파일을 사용합니다.
+MODEL_DIR = Path(__file__).resolve().parents[1] / "shared" / "models"
 
 DETECTION_CONFIDENCE = 0.25
 BREED_CONFIDENCE = 0.50
