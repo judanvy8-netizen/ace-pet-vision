@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 from PIL import Image
 from .pet_model import (MODEL_DIR, YOLO_URL, YOLO_SHA256, YOLO_S_URL, YOLO_S_SHA256,
+                        YOLO_M_URL, YOLO_M_SHA256,
                         BREED_URL, BREED_SHA256, model_file, BreedClassifier, BREED_CONFIDENCE)
 from .visualizer import annotate
 
@@ -37,6 +38,48 @@ def yolo_rescue():
     if model.names.get(15) != "cat" or model.names.get(16) != "dog":
         raise ValueError("YOLO11s에 COCO cat/dog 클래스가 필요합니다.")
     return model
+
+
+def yolo_strong():
+    """More capable detector; load only if YOLO11n and YOLO11s both miss."""
+    os.environ.setdefault("YOLO_CONFIG_DIR", str(MODEL_DIR / "settings"))
+    from ultralytics import YOLO
+    model = YOLO(str(model_file("yolo11m.pt", YOLO_M_URL, YOLO_M_SHA256)))
+    if model.names.get(15) != "cat" or model.names.get(16) != "dog":
+        raise ValueError("YOLO11m에 COCO cat/dog 클래스가 필요합니다.")
+    return model
+
+
+def zoomed_pet_rescue(image, model, classifier, *, conf=0.07):
+    """Run real YOLO detection on overlapping crops; restore original coordinates.
+
+    This is used only after all full-image attempts fail. It never constructs a
+    detection box from filenames, metadata or breed-classification predictions.
+    """
+    height, width = image.shape[:2]
+    if min(height, width) < 50:
+        return []
+    regions = [
+        (int(width * .08), int(height * .08), int(width * .92), int(height * .92)),
+        (0, 0, int(width * .78), height),
+        (int(width * .22), 0, width, height),
+    ]
+    ids = [i for i, name in model.names.items() if name in ("cat", "dog")]
+    for left, top, right, bottom in regions:
+        crop = image[top:bottom, left:right]
+        if crop.size == 0:
+            continue
+        result = model.predict(crop, classes=ids, conf=conf, iou=0.45,
+                               imgsz=960, device="cpu", verbose=False)[0]
+        pets = classify_pets(result, crop, classifier)
+        if pets:
+            for pet in pets:
+                pet["x1"] += left
+                pet["x2"] += left
+                pet["y1"] += top
+                pet["y2"] += top
+            return deduplicate_pets(pets)
+    return []
 
 
 def breed_model(confidence=BREED_CONFIDENCE):

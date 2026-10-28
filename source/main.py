@@ -7,7 +7,7 @@ import logging
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from shared.common import (yolo, image_files, read_image, save_image, save_csv,
-                           breed_model, yolo_rescue, classify_pets, draw_pets, result_path,
+                           breed_model, yolo_rescue, yolo_strong, zoomed_pet_rescue, classify_pets, draw_pets, result_path,
                            read_ground_truth, read_photo_sources, single_pet_review,
                            COUNT_FIELDS, BREED_FIELDS)
 from shared.pet_model import prepare_models
@@ -37,7 +37,7 @@ def main(argv=None):
     ap.add_argument("--rescue-conf", type=probability, default=0.18,
                     help="미탐지 재검사의 탐지 신뢰도 기준 (기본 0.18)")
     ap.add_argument("--deep-rescue", action="store_true",
-                    help="재검사도 실패하면 YOLO11s 고해상도+TTA로 한 번 더 검사 (CPU 느림)")
+                    help="하위 호환용 옵션: 고해상도 재검사는 이제 자동 실행됩니다.")
     ap.add_argument("--single-pet-review", action="store_true",
                     help="동물이 반드시 1마리라는 사람이 확인한 사진에서만 사용: 검출 실패 시 품종만 추정해 검토용으로 기록")
     ap.add_argument("--limit", type=int, default=20, help="처음 20장; 0이면 전체")
@@ -75,7 +75,8 @@ def main(argv=None):
     rows, breeds, used = [], [], set()
     save_csv(output / "pet_counts.csv", COUNT_FIELDS, rows)
     save_csv(output / "pet_breeds.csv", BREED_FIELDS, breeds)
-    rescue_model = None  # Load the larger detector only if a photo needs rescue.
+    rescue_model = None  # Load extra detectors only for missed photos.
+    strong_model = None
     for index, path in enumerate(files, 1):
         filename = path.relative_to(input_root).as_posix()
         row = dict.fromkeys(COUNT_FIELDS, "")
@@ -99,15 +100,36 @@ def main(argv=None):
                 )[0]
                 pets = classify_pets(rescue_result, image, classifier)
                 detector_name = "yolo11s_rescue"
-                if not pets and args.deep_rescue:
-                    # Higher resolution and test-time augmentation may recover
-                    # difficult poses; confidence is lower, so REVIEW results.
+                if not pets:
+                    # This stage is automatic: no extra CLI flag is needed.
                     deep_result = rescue_model.predict(
                         image, classes=rescue_ids, conf=0.06, iou=0.45,
                         imgsz=1280, augment=True, device="cpu", verbose=False,
                     )[0]
                     pets = classify_pets(deep_result, image, classifier)
                     detector_name = "yolo11s_tta"
+                if not pets and not args.single_pet_review:
+                    # Try a stronger model on the full photo and then zoomed crops.
+                    # Never count an animal without an actual detector box.
+                    try:
+                        if strong_model is None:
+                            strong_model = yolo_strong()
+                        strong_ids = [i for i, name in strong_model.names.items() if name in TARGETS]
+                        strong_result = strong_model.predict(
+                            image, classes=strong_ids, conf=0.07, iou=0.45,
+                            imgsz=960, device="cpu", verbose=False,
+                        )[0]
+                        pets = classify_pets(strong_result, image, classifier)
+                        detector_name = "yolo11m"
+                        if not pets:
+                            pets = zoomed_pet_rescue(image, strong_model, classifier)
+                            detector_name = "yolo11m_zoomed"
+                    except (OSError, ValueError, RuntimeError) as extra_error:
+                        # If the extra weight download fails, preserve normal
+                        # no_detection output and surface the warning.
+                        logging.warning("추가 탐지 모델 준비/실행 실패: %s - %s", filename, extra_error)
+                        row["error"] = "추가 탐지 실패: " + str(extra_error)
+                        detector_name = "yolo11m_unavailable"
             if not pets and args.single_pet_review:
                 # The user explicitly confirms exactly one animal in this photo.
                 # This is NOT a detected box, and must not be scored as detection.
