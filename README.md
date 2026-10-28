@@ -29,7 +29,7 @@
 
 - 사진 파일: `data/images/img_001.jpg` ~ `img_020.jpg` (번호만 표시).
 - [사진기록.csv](data/사진기록.csv): **한국어 기록표**. 품종·실제 마릿수는 확인된 기존 결과를 옮겼고, **허가·담당자 칸은 직접 작성**합니다.
-- [ground_truth.csv](data/ground_truth.csv): 모델이 읽는 개·고양이 정답표.
+- [ground_truth.csv](data/ground_truth.csv): **제목 행 없는 5열 수기 정답표**. 각 줄은 `파일명,동물 종류,고양이 수,개 수,장면 설명` 순서입니다. 예: `img_001.jpg,고양이,1,0,고양이 한 마리`. 1~3단계 개선본은 이 형식과 기존 제목 포함 형식을 모두 읽습니다.
 - [metadata.csv](data/metadata.csv): 출처·라이선스·품종 표기 근거.
 - [test_cases.csv](test_cases.csv): 실제/미검증 테스트 항목.
 

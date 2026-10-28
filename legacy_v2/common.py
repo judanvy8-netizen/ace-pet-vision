@@ -157,27 +157,5 @@ def result_path(relative, used):
     used.add(path.as_posix().casefold())
     return path
 
-
-def read_ground_truth(path):
-    """정답은 사람이 작성합니다. 빈 칸을 0마리로 취급하지 않습니다."""
-    if not path.is_file():
-        return {}
-    truth = {}
-    with path.open(encoding="utf-8-sig", newline="") as handle:
-        reader = csv.DictReader(handle)
-        if not {"filename", "actual_cat", "actual_dog"}.issubset(reader.fieldnames or []):
-            raise ValueError("정답표에 filename, actual_cat, actual_dog 열이 필요합니다.")
-        for row in reader:
-            name = row["filename"].strip().replace("\\", "/")
-            if not name or name in truth:
-                raise ValueError(f"정답표 파일명이 비었거나 중복입니다: {name}")
-            counts = {}
-            for key in ("actual_cat", "actual_dog"):
-                value = (row[key] or "").strip()
-                if value and not (value.isascii() and value.isdigit()):
-                    raise ValueError(f"정답표 {name}: {key}는 0 이상의 정수 또는 빈 칸이어야 합니다.")
-                counts[key] = int(value) if value else None
-            truth[name] = counts
-    return truth
-
-
+# 세 버전 모두 동일한 수기 정답표 형식(제목 없는 CSV)을 읽습니다.
+from shared.truth_reader import read_ground_truth
