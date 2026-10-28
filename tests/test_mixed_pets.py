@@ -1,6 +1,7 @@
 """혼합 사진 입력 확인: 실제 모델 추론과 구분된 입력/모의 파이프라인 테스트."""
 from pathlib import Path
 from types import SimpleNamespace
+from PIL import Image
 from unittest.mock import MagicMock
 import sys
 import unittest
@@ -16,10 +17,13 @@ class MixedPetTests(unittest.TestCase):
     def test_four_images_and_manual_counts(self):
         """각 사진에 고양이 1마리, 개 1마리라는 수기 기준을 확인합니다."""
         files = common.image_files(ROOT / "data/mixed_samples")
-        self.assertEqual([p.name for p in files], [f"mix_{i:02d}.webp" for i in range(1, 5)])
+        self.assertEqual([p.name for p in files], [f"mix_{i:02d}.jpg" for i in range(1, 5)])
         truth = common.read_ground_truth(ROOT / "data/mixed_ground_truth.csv")
         self.assertEqual(set(truth), {p.name for p in files})
         for path in files:
+            with Image.open(path) as actual_photo:
+                self.assertEqual(actual_photo.format, "JPEG")
+                self.assertGreaterEqual(min(actual_photo.size), 100)
             image = common.read_image(path)
             self.assertGreaterEqual(min(image.shape[:2]), 100)
             self.assertEqual(truth[path.name], {"actual_cat": 1, "actual_dog": 1})

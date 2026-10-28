@@ -43,16 +43,22 @@
 
 **선생님 필수:** 7명 모두 **자신이 직접 수정한 코드 1건과 함수 설명 1개**를 남겨야 합니다. 역할 배정이 개인 구현 완료를 의미하지는 않습니다. 선택 기능은 교사와 협의합니다.
 
-## 개·고양이 혼합 사진 4장 — 별도 테스트
+## 혼합 JPG 4장 — 실제 모델 테스트 전용 버전
 
-- `data/mixed_samples/mix_01.webp` ~ `mix_04.webp`: 대화 캡처의 2×2 이미지에서 각 칸을 분리한 약 117×117픽셀 테스트용 사진. 원본 이미지가 아니며 AI 생성 여부와 저작권·사용 허가는 확인되지 않았습니다.
-- `data/mixed_ground_truth.csv`: **제목 행 없는 5열 수기 마릿수 정답표**. 네 장 모두 고양이 1마리·개 1마리입니다. 품종 정답이나 모델 실행 결과를 뜻하지 않습니다.
-- 원래 20장과 섞이지 않도록 별도 입력 폴더에 보관합니다. 이 샘플은 실제 모델 추론이 **아직 미검증**이며 낮은 해상도 때문에 원본보다 탐지가 어려울 수 있습니다.
-- 실제 모델로 실행하려면 Windows에서 아래 명령을 사용하고 각 사진의 두 개체에 모두 박스가 그려졌는지 결과 이미지로 직접 확인합니다.
+기존 WebP 이미지 4장을 **실제 JPEG 형식**으로 변환해 `data/mixed_samples/mix_01.jpg` ~ `mix_04.jpg`에 저장했습니다. 모두 약 117×117픽셀의 작게 잘린 사진이므로 모델 인식이 어려울 수 있습니다. 원본 캡처의 출처·사용권은 별도 확인이 필요합니다.
+
+- [혼합 정답표](data/mixed_ground_truth.csv): 각 파일에 **고양이 1마리·개 1마리**, 제목 없는 5열 수기 CSV.
+- [main-mixed.py](source/main-mixed.py): **혼합 전용 검사 버전**. JPG 형식 검사 → 기존 `main-3.py`를 실제 AI 모델로 실행 → 개·고양이 2마리를 각각 찾았는지 정답과 비교.
+- [run-mixed.bat](run-mixed.bat): Windows에서 한 번에 실행하는 파일. 기존 `main.py`와 `main-3.py`는 수정하지 않았습니다.
 
 ```powershell
-.\.venv\Scripts\python.exe source\main-3.py --input data\mixed_samples --truth data\mixed_ground_truth.csv --output outputs\mixed_samples --limit 0
+git pull --ff-only
+.\run-mixed.bat --check-files
+.\run-mixed.bat
 ```
 
-- 결과: `outputs/mixed_samples/pet_counts.csv`, `pet_breeds.csv`, `mix_01_pets.jpg` ~ `mix_04_pets.jpg`. 개·고양이 중 한 종류만 검출되면 현재 추가 탐지 단계가 자동 실행되지 않을 수 있어 검토가 필요합니다.
-- `tests/test_mixed_pets.py`: 모델 다운로드 없이 입력 파일·정답표 및 개/고양이 2개 박스의 분리 처리를 모의 검증합니다. 이 모의 테스트 통과를 실제 YOLO/ResNet50 정확도로 해석하면 안 됩니다.
+첫 명령은 파일·정답표 검증만 수행하고, 둘째는 **실제 YOLO11 + ResNet50 추론**을 실행합니다. 결과는 `outputs/mixed_samples/`의 `mix_01_pets.jpg` 등 이미지, `pet_counts.csv`, `pet_breeds.csv`, **`혼합_테스트_결과.csv`**, **`혼합_테스트_요약.md`**로 저장됩니다.
+
+**판정 기준:** 각 사진에 고양이와 개가 모두 실제 박스로 탐지되고 최종 상태가 `ok`이면 **통과**. 1종만 탐지하거나 개수가 다르면 **실패**, 마릿수는 맞지만 모델 간 종 판정 충돌이 있으면 **검토**로 구분합니다. 정답표의 숫자를 이용해 미탐 동물을 만들어내지 않습니다.
+
+검증 범위: **JPG 4장 형식·정답표 확인, 테스트용 모의 검사 6개 통과. 실제 AI 가중치로 사진 4장 재추론은 아직 수행하지 않았습니다.** 특히 `main-3.py`는 동물이 0마리일 때 추가 탐지기를 호출하므로 한 종류만 발견하는 상황은 실패로 기록되어 개선 대상입니다. `tests/test_mixed_pets.py`와 `tests/test_mixed_runner.py`는 실제 모델 정확도와 구별되는 단위 테스트입니다.
