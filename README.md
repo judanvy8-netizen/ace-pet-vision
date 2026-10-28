@@ -50,27 +50,25 @@ ace-pet-vision/
 
 **IntelliJ에서 실제 모델 확인:** 프로젝트 루트(예: `C:\KSW\project_05_pet_detection`)에 GitHub 최신 파일을 반영하고, Python 3.11의 `.venv\Scripts\python.exe`를 Python SDK로 선택합니다. `source/main.py`를 Run 하되 작업 디렉터리를 프로젝트 루트로 설정하세요. 첫 실행에는 인터넷 연결이 필요합니다.
 
-먼저 `run.bat --prepare-models`로 YOLO11n, YOLO11s와 ResNet50 가중치 다운로드·해시 검증을 확인할 수 있습니다. 그 다음 `run.bat --input data/images/03_dog_beagle.jpg --limit 1`로 **실제 품종 모델까지** 단일 사진을 테스트하세요. `outputs/pet_counts.csv`, `outputs/pet_breeds.csv`, `outputs/03_dog_beagle_pets.jpg`가 생성되는지 확인합니다. 이상이 없다면 `run.bat --limit 0`으로 20장을 검사합니다. Windows 배치 파일의 `pause`는 정상 동작이며, IntelliJ에서 직접 실행하는 경우에는 추가 인수 없이 기본 20장을 처리합니다.
+필요하다면 `run.bat --prepare-models`로 YOLO11n·YOLO11s·YOLO11m·ResNet50 가중치 다운로드·해시 검증을 미리 확인할 수 있습니다. 하지만 **실제 사용은 `main.py`를 그냥 실행하는 것만으로 충분**합니다. 모델이 없는 경우 필요한 가중치를 자동으로 받습니다. 그 다음 `run.bat --input data/images/03_dog_beagle.jpg --limit 1`로 **실제 품종 모델까지** 단일 사진을 테스트하세요. `outputs/pet_counts.csv`, `outputs/pet_breeds.csv`, `outputs/03_dog_beagle_pets.jpg`가 생성되는지 확인합니다. 이상이 없다면 `run.bat --limit 0`으로 20장을 검사합니다. Windows 배치 파일의 `pause`는 정상 동작이며, IntelliJ에서 직접 실행하는 경우에는 추가 인수 없이 기본 20장을 처리합니다.
 
 기본 입력은 `data/images`, 기본 처리 수는 처음 20장입니다. `--limit 0`은 전체입니다.
 
-### 16·19번 미탐지 사진 추가 확인
+### 자동 미탐지 보완 (기본 실행에 포함)
 
-기본 YOLO11n·YOLO11s에서 모두 0마리라면, 아래처럼 고해상도 TTA 재탐지를 시도할 수 있습니다. CPU에서 느리며 결과 개선은 실제 사진으로 확인해야 합니다.
+**추가 명령이나 별도 결과 폴더는 필요하지 않습니다.** IntelliJ에서 `source/main.py`를 Run 하거나 프로젝트 루트에서 `run.bat`만 실행하면 모든 사진에 동일한 자동 처리 규칙이 적용됩니다.
 
-```powershell
-.\run.bat --input data/images/16_dog_samoyed.jpg --deep-rescue --output outputs/check_16
-.\run.bat --input data/images/19_cat_sphynx.jpg --deep-rescue --output outputs/check_19
-```
+1. YOLO11n으로 기본 탐지 → 동물 박스가 있으면 37품종 ResNet50 분류
+2. 탐지 0마리면 YOLO11s로 재검사
+3. 그래도 0마리면 YOLO11s 고해상도 1280·TTA로 **자동** 재검사 (예전 `--deep-rescue` 별도 지정 불필요)
+4. 그래도 0마리면 YOLO11m으로 전신 이미지와 일부 확대 이미지를 **자동** 재검사
+5. 탐지 결과는 예전과 똑같이 `outputs/`의 **기존 파일명**을 사용합니다.
 
-그래도 실패하고 **사람이 사진마다 동물 한 마리가 있다고 직접 확인했다면**, 다음은 검출이 아닌 **분류 후보 검토용**으로만 사용할 수 있습니다.
+YOLO11m 가중치는 실제 필요해지는 순간에만 다운로드합니다(약 41MB). 일반적인 사진에는 경량 모델만 사용합니다. CPU에서는 미탐지 사진 재검사가 느릴 수 있습니다.
 
-```powershell
-.\run.bat --input data/images/16_dog_samoyed.jpg --single-pet-review --output outputs/review_16
-.\run.bat --input data/images/19_cat_sphynx.jpg --single-pet-review --output outputs/review_19
-```
+**검증 상태:** 실제 사용자 실행에서 19번 스핑크스는 탐지가 확인되었지만, 16번 사모예드는 기존 방식으로 검출되지 않았습니다. 자동 보완을 추가했으나 새 YOLO11m 재검사에서 실제 검출에 성공하는지는 별도 확인이 필요합니다. YOLO 모델이 끝내 박스를 찾지 못하면 **0마리 미탐지로 정직하게 기록**하고, 파일명·정답표·품종 분류 결과로 탐지를 조작하지 않습니다.
 
-`--single-pet-review`는 **YOLO가 동물을 검출했다는 뜻이 아닙니다.** ResNet50이 사진 전체에서 품종 후보를 추정하며, 결과에 `review_only` / `REVIEW: NOT YOLO DETECTED`가 표시됩니다. 실제 객체 탐지 정확도에는 포함하지 마세요. 동물이 없는 사진이나 여러 마리가 있는 사진에는 이 옵션을 사용하지 않습니다.
+`--single-pet-review`는 연구·검토용 수동 옵션이며 기본 실행에 포함되지 않습니다. 이 옵션은 동물 1마리를 사람이 확인한 사진에서 전체 이미지를 품종 분류기에 넣을 뿐, **YOLO 객체 검출 성공을 뜻하지 않습니다.**
 
 사진 한 장: `.\run.bat --input data/images/03_dog_beagle.jpg`.
 탐지 기준 비교: `.\run.bat --conf 0.5`.
@@ -79,7 +77,8 @@ ace-pet-vision/
 ## 모델
 
 - 1차 탐지: `shared/models/yolo11n.pt` (CPU용 경량 모델)
-- 미탐지 재검사: `shared/models/yolo11s.pt` (1차 검출 0개일 때만 실행; 약 19MB 추가 다운로드)
+- 2차 탐지: `shared/models/yolo11s.pt` (1차 0마리일 때만 실행; 약 19MB)
+- 최종 재검사: `shared/models/yolo11m.pt` (고해상도 YOLO11s도 실패했을 때만 실행; 약 41MB)
 - 품종: `shared/models/oxford-pets-resnet50.pth`
 
 예전 프로젝트 `models/`에 같은 모델이 있으면 검증 후 새 위치로 복사해 재사용합니다. 기존 파일은 삭제하지 않습니다.
@@ -101,7 +100,7 @@ outputs/
 
 사진 위쪽에 Dogs/Cats 수, 동물마다 박스·품종 후보·점수를 표시합니다. 점수가 낮거나 종이 불일치하면 보류합니다.
 **중복 탐지 보정:** 같은 동물의 전신·얼굴 박스처럼 크게 겹치는 박스는 한 마리로 셉니다. 실제 동물 두 마리가 겹친 사진은 수작업 검증이 필요합니다.
-**미탐지 보완:** YOLO11n이 0마리를 탐지한 사진만 YOLO11s를 입력 크기 960, 신뢰도 0.18로 재검사합니다. 개선을 시도하지만 모든 오탐·미탐이 해결된다는 보장은 없습니다. CPU에서 느리거나 추가 모델 다운로드가 어려우면 `run.bat --no-rescue`로 끌 수 있고 `--rescue-conf 0.25`처럼 기준을 조절할 수 있습니다.
+**미탐지 보완:** YOLO11n이 0마리인 사진만 YOLO11s·고해상도 TTA·YOLO11m 확대 검사 순서로 자동 재검사합니다. 기본 `main.py` 실행만으로 동작하며 새 결과 폴더는 만들지 않습니다. 실제 검출 개선은 사진별로 확인해야 하고, 실패 시 결과를 임의로 1마리로 바꾸지 않습니다.
 `pet_counts.csv`에는 사진별 cat/dog 수, 정답과 개수 오차, 처리 상태 및 사용 탐지 모델(`detector`)이 기록됩니다. 사진 출처는 **`source_url` 열**에 나타나며 `data/metadata.csv`의 `source_page` 주소를 가져옵니다. 출처가 없는 사진은 빈칸으로 표시합니다.
 `pet_breeds.csv`에는 동물별 품종 후보가 기록됩니다. 오류는 `errors.log`에서 확인합니다.
 
