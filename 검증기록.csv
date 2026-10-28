@@ -1,0 +1,21 @@
+﻿filename,source_breed,final_species,yolo_original_label,yolo_box_confidence,breed_label,breed_candidate,breed_candidate_confidence,status,detector,tta_used,reference_candidate_agrees,human_count_confirmed
+img_001.jpg,abyssinian,cat,cat,0.93558639,Abyssinian,Abyssinian,0.98757577,ok,yolo11n,False,yes,yes
+img_002.jpg,basset_hound,dog,dog,0.78428161,Basset Hound,Basset Hound,0.87488925,ok,yolo11n,False,yes,yes
+img_003.jpg,beagle,dog,dog,0.91470236,Beagle,Beagle,0.53319764,ok,yolo11n,False,yes,yes
+img_004.jpg,bengal,cat,cat,0.80711883,Bengal,Bengal,0.62374938,ok,yolo11n,True,yes,yes
+img_005.jpg,birman,cat,cat,0.36371064,Birman,Birman,0.83157617,ok,yolo11n,False,yes,yes
+img_006.jpg,boxer,dog,dog,0.42189556,Boxer,Boxer,0.78327185,ok,yolo11n,False,yes,yes
+img_007.jpg,british_shorthair,cat,cat,0.67669564,British Shorthair,British Shorthair,0.66191858,ok,yolo11n,False,yes,yes
+img_008.jpg,chihuahua,dog,dog,0.79012746,Chihuahua,Chihuahua,0.52328055,ok,yolo11n,True,yes,yes
+img_009.jpg,english_setter,dog,dog,0.87869328,English Setter,English Setter,0.89852047,ok,yolo11n,False,yes,yes
+img_010.jpg,maine_coon,cat,cat,0.90258586,Maine Coon,Maine Coon,0.69278204,ok,yolo11n,False,yes,yes
+img_011.jpg,persian,cat,cat,0.93573523,Persian,Persian,0.66448194,ok,yolo11n,False,yes,yes
+img_012.jpg,pomeranian,dog,dog,0.36348647,Pomeranian,Pomeranian,0.94152254,ok,yolo11n,False,yes,yes
+img_013.jpg,pug,dog,dog,0.86038804,Pug,Pug,0.83145964,ok,yolo11n,False,yes,yes
+img_014.jpg,ragdoll,cat,cat,0.85123539,Ragdoll,Ragdoll,0.68589556,ok,yolo11n,False,yes,yes
+img_015.jpg,russian_blue,cat,cat,0.87690187,Russian Blue,Russian Blue,0.72185504,ok,yolo11n,False,yes,yes
+img_016.jpg,samoyed,dog,bear,0.91661155,unknown,Samoyed,0.82366014,review_detection,yolo11m_other_animal_review,False,yes,yes
+img_017.jpg,shiba_inu,dog,dog,0.91909260,Shiba Inu,Shiba Inu,0.95077944,ok,yolo11n,False,yes,yes
+img_018.jpg,siamese,cat,cat,0.87368244,Siamese,Siamese,0.77355212,ok,yolo11n,False,yes,yes
+img_019.jpg,sphynx,cat,dog,0.15386985,unknown,Sphynx,0.94875294,review_species,yolo11s_tta,False,yes,yes
+img_020.jpg,yorkshire_terrier,dog,dog,0.92143559,Yorkshire Terrier,Yorkshire Terrier,0.97765303,ok,yolo11n,False,yes,yes

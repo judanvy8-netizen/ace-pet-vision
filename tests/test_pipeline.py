@@ -214,11 +214,11 @@ class PipelineTests(unittest.TestCase):
             source = Path(directory) / "metadata.csv"
             source.write_text(
                 "filename,source_page,license\n"
-                "16_dog_samoyed.jpg,https://commons.wikimedia.org/wiki/File:BeachDog2.jpg,PD\n"
+                "img_016.jpg,https://commons.wikimedia.org/wiki/File:BeachDog2.jpg,PD\n"
                 "no_link.jpg,,\n"
                 "danger.jpg,=HYPERLINK(\"bad\"),\n", encoding="utf-8-sig")
             result = common.read_photo_sources(source)
-            self.assertEqual(result["16_dog_samoyed.jpg"],
+            self.assertEqual(result["img_016.jpg"],
                              "https://commons.wikimedia.org/wiki/File:BeachDog2.jpg")
             self.assertEqual(result["no_link.jpg"], "")
             self.assertEqual(result["danger.jpg"], "")
@@ -241,7 +241,7 @@ class PipelineTests(unittest.TestCase):
             root = Path(directory)
             source, output = root/"images", root/"outputs"
             source.mkdir()
-            Image.new("RGB", (80, 100), "blue").save(source/"19_cat_sphynx.jpg")
+            Image.new("RGB", (80, 100), "blue").save(source/"img_019.jpg")
             breed = BreedOnly()
             with patch.object(app, "SAMPLE_INPUT", source), patch.object(app, "OUTPUT", output), \
                  patch.object(app, "yolo", return_value=EmptyDetector()), \
@@ -315,7 +315,7 @@ class PipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); src = root / "images"; out = root / "outputs"
             src.mkdir()
-            Image.new("RGB", (120, 90), "white").save(src / "16_dog_samoyed.jpg")
+            Image.new("RGB", (120, 90), "white").save(src / "img_016.jpg")
             primary, secondary = FakeYOLO(), FakeYOLO()
             with patch.object(app, "SAMPLE_INPUT", src), patch.object(app, "OUTPUT", out), \
                  patch.object(app, "yolo", return_value=primary), \
@@ -330,7 +330,7 @@ class PipelineTests(unittest.TestCase):
             with (out / "pet_counts.csv").open(encoding="utf-8-sig") as fh:
                 row = list(csv.DictReader(fh))[0]
             self.assertEqual(row["detector"], "yolo11s_tta")
-            self.assertTrue((out / "16_dog_samoyed_pets.jpg").is_file())
+            self.assertTrue((out / "img_016_pets.jpg").is_file())
             self.assertFalse((out / "check_16").exists())
 
     def test_main_automatically_runs_strong_zoom_when_all_full_miss(self):
@@ -349,7 +349,7 @@ class PipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); src = root / "images"; out = root / "outputs"
             src.mkdir()
-            Image.new("RGB", (120, 90), "white").save(src / "16_dog_samoyed.jpg")
+            Image.new("RGB", (120, 90), "white").save(src / "img_016.jpg")
             primary, secondary, strong = FakeYOLO(), FakeYOLO(), FakeYOLO()
             with patch.object(app, "SAMPLE_INPUT", src), patch.object(app, "OUTPUT", out), \
                  patch.object(app, "yolo", return_value=primary), \
@@ -365,7 +365,7 @@ class PipelineTests(unittest.TestCase):
             with (out / "pet_counts.csv").open(encoding="utf-8-sig") as fh:
                 row = list(csv.DictReader(fh))[0]
             self.assertEqual((row["dog"], row["detector"]), ("1", "yolo11m_zoomed"))
-            self.assertTrue((out / "16_dog_samoyed_pets.jpg").is_file())
+            self.assertTrue((out / "img_016_pets.jpg").is_file())
             self.assertFalse((out / "check_16").exists())
 
     def test_zoomed_pet_boxes_map_to_original_image_coordinates(self):
