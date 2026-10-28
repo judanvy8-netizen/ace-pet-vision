@@ -22,7 +22,21 @@ def annotate(image, predictions):
         draw.rectangle((x1, y1, x2 - 1, y2 - 1), outline=color, width=max(2, round(image.width / 500)))
         label = f'#{number} {prediction["species"]}: {prediction["breed"]} {prediction["breed_confidence"]:.0%}'
         if prediction["status"] == "review":
-            label = f'#{number} {prediction["species"]}: {prediction["candidate_breed"]} {prediction["breed_confidence"]:.0%} (review)'
+            reason = prediction.get("reason", "")
+            if reason == "species_corrected_high_confidence":
+                tag = f'YOLO {prediction.get("yolo_species", "?")} corrected'
+            elif reason == "species_conflict":
+                tag = "breed / species disagree"
+            elif reason == "low_confidence":
+                tag = "low confidence"
+            elif reason.startswith("other_animal_class:"):
+                tag = f'YOLO {reason.split(":", 1)[1]}'
+            elif reason == "single_pet_assumed_not_yolo_detected":
+                tag = "breed only, no YOLO detection"
+            else:
+                tag = "review"
+            label = (f'#{number} {prediction["species"]}: {prediction["candidate_breed"]} '
+                     f'{prediction["breed_confidence"]:.1%} [{tag}]')
         current_font = font
         while draw.textbbox((0, 0), label, font=current_font)[2] > image.width - 8 and size > 8:
             size -= 1
@@ -38,6 +52,8 @@ def annotate(image, predictions):
     # 원본 위에 여백을 추가하여 동물을 가리지 않고 사진별 마릿수를 표시합니다.
     counts = animal_counts(predictions)
     title = f'Dogs: {counts["dog_count"]}  |  Cats: {counts["cat_count"]}'
+    if any(p.get("reason") == "species_corrected_high_confidence" for p in predictions):
+        title += "  |  REVIEW: SPECIES CORRECTED"
     if any(p.get("reason") == "single_pet_assumed_not_yolo_detected" for p in predictions):
         title += "  |  REVIEW: NOT YOLO DETECTED"
     elif any(p.get("reason", "").startswith("other_animal_class:") for p in predictions):
