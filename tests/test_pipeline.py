@@ -292,6 +292,101 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(row["dog"], "1")
             self.assertEqual(row["detector"], "yolo11s_tta")
 
+    def test_main_automatically_runs_deep_rescue_without_flag(self):
+        """Plain main() runs high-res TTA without any additional CLI argument."""
+        from types import SimpleNamespace
+        from PIL import Image
+        class FakeYOLO:
+            names = {15: "cat", 16: "dog"}
+            def __init__(self): self.calls = []
+            def predict(self, image, **kwargs):
+                self.calls.append(kwargs)
+                return [SimpleNamespace(names=self.names, boxes=[1] if kwargs.get("augment") else [])]
+        def make_pets(result, image, classifier):
+            if not result.boxes: return []
+            return [dict(species="dog", breed="Samoyed", candidate_breed="Samoyed",
+                         breed_confidence=.74, detection_confidence=.12,
+                         status="classified", reason="", x1=0, y1=1, x2=50, y2=50)]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); src = root / "images"; out = root / "outputs"
+            src.mkdir()
+            Image.new("RGB", (120, 90), "white").save(src / "16_dog_samoyed.jpg")
+            primary, secondary = FakeYOLO(), FakeYOLO()
+            with patch.object(app, "SAMPLE_INPUT", src), patch.object(app, "OUTPUT", out), \
+                 patch.object(app, "yolo", return_value=primary), \
+                 patch.object(app, "yolo_rescue", return_value=secondary), \
+                 patch.object(app, "yolo_strong", side_effect=AssertionError("should not need YOLO11m")), \
+                 patch.object(app, "breed_model"), patch.object(app, "classify_pets", side_effect=make_pets):
+                self.assertEqual(app.main([]), 0)
+            self.assertEqual(len(primary.calls), 1)
+            self.assertEqual(len(secondary.calls), 2)
+            self.assertTrue(secondary.calls[1]["augment"])
+            self.assertEqual(secondary.calls[1]["imgsz"], 1280)
+            with (out / "pet_counts.csv").open(encoding="utf-8-sig") as fh:
+                row = list(csv.DictReader(fh))[0]
+            self.assertEqual(row["detector"], "yolo11s_tta")
+            self.assertTrue((out / "16_dog_samoyed_pets.jpg").is_file())
+            self.assertFalse((out / "check_16").exists())
+
+    def test_main_automatically_runs_strong_zoom_when_all_full_miss(self):
+        """Plain main() reaches a strong detector and saves to ordinary outputs."""
+        from types import SimpleNamespace
+        from PIL import Image
+        class FakeYOLO:
+            names = {15: "cat", 16: "dog"}
+            def __init__(self): self.calls = []
+            def predict(self, image, **kwargs):
+                self.calls.append(kwargs)
+                return [SimpleNamespace(names=self.names, boxes=[])]
+        pet = dict(species="dog", breed="Samoyed", candidate_breed="Samoyed",
+                   breed_confidence=.71, detection_confidence=.16,
+                   status="classified", reason="", x1=8, y1=5, x2=79, y2=75)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); src = root / "images"; out = root / "outputs"
+            src.mkdir()
+            Image.new("RGB", (120, 90), "white").save(src / "16_dog_samoyed.jpg")
+            primary, secondary, strong = FakeYOLO(), FakeYOLO(), FakeYOLO()
+            with patch.object(app, "SAMPLE_INPUT", src), patch.object(app, "OUTPUT", out), \
+                 patch.object(app, "yolo", return_value=primary), \
+                 patch.object(app, "yolo_rescue", return_value=secondary), \
+                 patch.object(app, "yolo_strong", return_value=strong) as get_strong, \
+                 patch.object(app, "breed_model"), patch.object(app, "classify_pets", return_value=[]), \
+                 patch.object(app, "zoomed_pet_rescue", return_value=[dict(pet)]) as zoom:
+                self.assertEqual(app.main([]), 0)
+            get_strong.assert_called_once_with()
+            zoom.assert_called_once()
+            self.assertEqual(secondary.calls[1]["imgsz"], 1280)
+            self.assertEqual(strong.calls[0]["imgsz"], 960)
+            with (out / "pet_counts.csv").open(encoding="utf-8-sig") as fh:
+                row = list(csv.DictReader(fh))[0]
+            self.assertEqual((row["dog"], row["detector"]), ("1", "yolo11m_zoomed"))
+            self.assertTrue((out / "16_dog_samoyed_pets.jpg").is_file())
+            self.assertFalse((out / "check_16").exists())
+
+    def test_zoomed_pet_boxes_map_to_original_image_coordinates(self):
+        from unittest.mock import MagicMock
+        from types import SimpleNamespace
+        from PIL import Image
+        import numpy as np
+        class FakeYOLO:
+            names = {15: "cat", 16: "dog"}
+            def predict(self, crop, **kwargs):
+                box = MagicMock()
+                box.cls.item.return_value = 16
+                box.conf.item.return_value = .3
+                box.xyxy[0].cpu().tolist.return_value = [20.2, 10.1, 100.5, 90.5]
+                return [SimpleNamespace(names=self.names, boxes=[box])]
+        class FakeBreed:
+            def classify(self, crop, species):
+                return dict(breed="Samoyed", candidate_breed="Samoyed",
+                            breed_confidence=.8, status="classified", reason="")
+        frame = np.asarray(Image.new("RGB", (400, 300), "white"))[:, :, ::-1].copy()
+        pets = common.zoomed_pet_rescue(frame, FakeYOLO(), FakeBreed())
+        self.assertEqual(len(pets), 1)
+        # The first zoom crop starts at 8% width (32) and 8% height (24).
+        self.assertEqual([pets[0][k] for k in ("x1", "y1", "x2", "y2")],
+                         [52, 34, 133, 115])
+
     def test_default_main_counts_breeds_and_corrupt_image(self):
         from PIL import Image
         class Detector:
