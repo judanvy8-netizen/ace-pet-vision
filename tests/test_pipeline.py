@@ -387,6 +387,93 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual([pets[0][k] for k in ("x1", "y1", "x2", "y2")],
                          [52, 34, 133, 115])
 
+    def test_animal_label_mismatch_uses_real_box_and_marks_review(self):
+        """A sheep/bear box is not discarded solely because its COCO label is wrong."""
+        from unittest.mock import MagicMock
+        from types import SimpleNamespace
+        import numpy as np
+        from PIL import Image
+        class Breed:
+            def classify_single_pet(self, crop):
+                self.crop = crop
+                return dict(species="dog", breed="unknown", candidate_breed="Samoyed",
+                            breed_confidence=.83, status="review",
+                            reason="single_pet_assumed_not_yolo_detected")
+        box = MagicMock()
+        box.cls.item.return_value = 18
+        box.conf.item.return_value = .47
+        box.xyxy[0].cpu().tolist.return_value = [10.2, 8.2, 80.8, 68.4]
+        result = SimpleNamespace(names={18:"sheep"}, boxes=[box])
+        image = np.asarray(Image.new("RGB", (100, 80), "white"))[:, :, ::-1].copy()
+        classifier = Breed()
+        found = common.classify_animal_proposals(result, image, classifier)
+        self.assertEqual(len(found), 1)
+        self.assertEqual((found[0]["species"], found[0]["candidate_breed"]), ("dog", "Samoyed"))
+        self.assertEqual(found[0]["reason"], "other_animal_class:sheep")
+        self.assertEqual(found[0]["status"], "review")
+        self.assertEqual((found[0]["x1"], found[0]["x2"]), (10, 81))
+        self.assertEqual(classifier.crop.size, (71, 61))
+
+    def test_other_animal_review_rejects_low_breed_score_and_nonanimals(self):
+        from unittest.mock import MagicMock
+        from types import SimpleNamespace
+        import numpy as np
+        from PIL import Image
+        class Breed:
+            def classify_single_pet(self, crop):
+                return dict(species="dog", breed="unknown", candidate_breed="Samoyed",
+                            breed_confidence=.30, status="review",
+                            reason="single_pet_assumed_not_yolo_detected")
+        box = MagicMock()
+        box.cls.item.return_value = 21
+        box.conf.item.return_value = .9
+        box.xyxy[0].cpu().tolist.return_value = [10, 5, 70, 55]
+        image = np.asarray(Image.new("RGB", (100, 80), "white"))[:, :, ::-1].copy()
+        self.assertEqual(common.classify_animal_proposals(
+            SimpleNamespace(names={21:"bear"}, boxes=[box]), image, Breed()), [])
+        self.assertEqual(common.classify_animal_proposals(
+            SimpleNamespace(names={21:"chair"}, boxes=[box]), image, Breed()), [])
+
+    def test_main_reviews_non_target_animal_box_without_extra_result_folder(self):
+        from unittest.mock import MagicMock
+        from types import SimpleNamespace
+        from PIL import Image
+        class Detector:
+            names = {15:"cat",16:"dog",18:"sheep"}
+            def __init__(self, strong=False):
+                self.strong=strong
+                self.calls=[]
+            def predict(self, image, **kwargs):
+                self.calls.append(kwargs)
+                if not self.strong:
+                    return [SimpleNamespace(names=self.names, boxes=[])]
+                box=MagicMock()
+                box.cls.item.return_value=18
+                box.conf.item.return_value=.42
+                box.xyxy[0].cpu().tolist.return_value=[4,7,70,56]
+                return [SimpleNamespace(names=self.names, boxes=[box])]
+        class Breed:
+            def classify_single_pet(self, crop):
+                return dict(species="dog",breed="unknown",candidate_breed="Samoyed",
+                            breed_confidence=.9,status="review",reason="single_pet_assumed_not_yolo_detected")
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory); source=root/"images"; output=root/"outputs";source.mkdir()
+            Image.new("RGB",(100,80),"white").save(source/"pet.png")
+            first,second,third=Detector(),Detector(),Detector(True)
+            with patch.object(app,"SAMPLE_INPUT",source), patch.object(app,"OUTPUT",output), \
+                 patch.object(app,"yolo",return_value=first), \
+                 patch.object(app,"yolo_rescue",return_value=second), \
+                 patch.object(app,"yolo_strong",return_value=third), \
+                 patch.object(app,"breed_model",return_value=Breed()):
+                self.assertEqual(app.main([]),0)
+            with (output/"pet_counts.csv").open(encoding="utf-8-sig") as fh:
+                row=list(csv.DictReader(fh))[0]
+            self.assertEqual((row["dog"],row["cat"],row["status"]),("1","0","review_detection"))
+            self.assertEqual(row["detector"],"yolo11m_other_animal_review")
+            self.assertEqual(row["dog_error"],"")
+            self.assertIsNone(third.calls[0]["classes"])
+            self.assertTrue((output/"pet_pets.jpg").exists())
+
     def test_default_main_counts_breeds_and_corrupt_image(self):
         from PIL import Image
         class Detector:

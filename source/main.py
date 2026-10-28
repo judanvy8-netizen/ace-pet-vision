@@ -7,7 +7,7 @@ import logging
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from shared.common import (yolo, image_files, read_image, save_image, save_csv,
-                           breed_model, yolo_rescue, yolo_strong, zoomed_pet_rescue, classify_pets, draw_pets, result_path,
+                           breed_model, yolo_rescue, yolo_strong, zoomed_pet_rescue, classify_animal_proposals, classify_pets, draw_pets, result_path,
                            read_ground_truth, read_photo_sources, single_pet_review,
                            COUNT_FIELDS, BREED_FIELDS)
 from shared.pet_model import prepare_models
@@ -114,16 +114,24 @@ def main(argv=None):
                     try:
                         if strong_model is None:
                             strong_model = yolo_strong()
-                        strong_ids = [i for i, name in strong_model.names.items() if name in TARGETS]
+                        # No COCO class filter here: a partly hidden Samoyed
+                        # may have been labeled as bear/sheep rather than dog.
                         strong_result = strong_model.predict(
-                            image, classes=strong_ids, conf=0.07, iou=0.45,
+                            image, classes=None, conf=0.05, iou=0.45,
                             imgsz=960, device="cpu", verbose=False,
                         )[0]
                         pets = classify_pets(strong_result, image, classifier)
                         detector_name = "yolo11m"
                         if not pets:
+                            pets = classify_animal_proposals(strong_result, image, classifier)
+                            if pets:
+                                detector_name = "yolo11m_other_animal_review"
+                        if not pets:
                             pets = zoomed_pet_rescue(image, strong_model, classifier)
-                            detector_name = "yolo11m_zoomed"
+                            detector_name = ("yolo11m_zoomed_other_animal_review"
+                                             if pets and any(p.get("reason", "").startswith("other_animal_class:")
+                                                             for p in pets)
+                                             else "yolo11m_zoomed")
                     except (OSError, ValueError, RuntimeError) as extra_error:
                         # If the extra weight download fails, preserve normal
                         # no_detection output and surface the warning.
@@ -138,8 +146,10 @@ def main(argv=None):
             counts = {name: sum(p["species"] == name for p in pets) for name in TARGETS}
             target = result_path(filename, used)
             save_image(output / target, draw_pets(image, pets))
-            result_status = "review_only" if detector_name == "resnet_single_pet_review" else (
-                "ok" if pets else "no_detection")
+            result_status = ("review_only" if detector_name == "resnet_single_pet_review"
+                             else "review_detection" if any(
+                                 p.get("reason", "").startswith("other_animal_class:") for p in pets)
+                             else "ok" if pets else "no_detection")
             row.update(**counts, status=result_status, detector=detector_name,
                        result_image=target.as_posix())
             for number, pet in enumerate(pets, 1):

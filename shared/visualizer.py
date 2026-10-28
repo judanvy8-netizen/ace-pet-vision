@@ -40,6 +40,8 @@ def annotate(image, predictions):
     title = f'Dogs: {counts["dog_count"]}  |  Cats: {counts["cat_count"]}'
     if any(p.get("reason") == "single_pet_assumed_not_yolo_detected" for p in predictions):
         title += "  |  REVIEW: NOT YOLO DETECTED"
+    elif any(p.get("reason", "").startswith("other_animal_class:") for p in predictions):
+        title += "  |  REVIEW: YOLO LABELED ANOTHER ANIMAL"
     title_size = max(8, min(28, image.width // 12))
     title_font = ImageFont.load_default(size=title_size)
     while draw.textbbox((0, 0), title, font=title_font)[2] > image.width - 8 and title_size > 1:

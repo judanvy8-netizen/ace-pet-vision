@@ -64,14 +64,16 @@ def zoomed_pet_rescue(image, model, classifier, *, conf=0.07):
         (0, 0, int(width * .78), height),
         (int(width * .22), 0, width, height),
     ]
-    ids = [i for i, name in model.names.items() if name in ("cat", "dog")]
     for left, top, right, bottom in regions:
         crop = image[top:bottom, left:right]
         if crop.size == 0:
             continue
-        result = model.predict(crop, classes=ids, conf=conf, iou=0.45,
+        # Do not filter COCO classes before checking if the dog was mislabeled.
+        result = model.predict(crop, classes=None, conf=conf, iou=0.45,
                                imgsz=960, device="cpu", verbose=False)[0]
         pets = classify_pets(result, crop, classifier)
+        if not pets:
+            pets = classify_animal_proposals(result, crop, classifier)
         if pets:
             for pet in pets:
                 pet["x1"] += left
@@ -164,6 +166,44 @@ def deduplicate_pets(predictions):
         if not any(_same_animal_box(candidate, earlier) for earlier in kept):
             kept.append(candidate)
     return sorted(kept, key=lambda pet: (pet["x1"], pet["y1"], pet["x2"], pet["y2"]))
+
+
+# COCO can mistake a side-view or partly obscured dog for another animal.
+# Only non-target ANIMAL classes are considered; generic objects are excluded.
+NON_TARGET_ANIMALS = {"bear", "sheep", "cow", "horse"}
+
+
+def classify_animal_proposals(result, image, classifier, *, min_breed_confidence=0.55):
+    """Review a real YOLO animal box whose COCO label was not cat/dog.
+
+    ResNet50 supplies a possible pet species and breed. It does NOT prove
+    that the YOLO box contains a dog or cat; return results marked REVIEW.
+    """
+    height, width = image.shape[:2]
+    proposals = []
+    for box in result.boxes:
+        animal_label = result.names[int(box.cls.item())]
+        if animal_label not in NON_TARGET_ANIMALS:
+            continue
+        a, b, c, d = box.xyxy[0].cpu().tolist()
+        x1, y1, x2, y2 = max(0, math.floor(a)), max(0, math.floor(b)), min(width, math.ceil(c)), min(height, math.ceil(d))
+        if x2 - x1 < 12 or y2 - y1 < 12:
+            continue
+        crop = Image.fromarray(cv2.cvtColor(image[y1:y2, x1:x2], cv2.COLOR_BGR2RGB))
+        prediction = classifier.classify_single_pet(crop)
+        confidence = float(prediction["breed_confidence"])
+        if confidence < min_breed_confidence:
+            continue
+        # The bbox came from YOLO, but its original class differs.
+        prediction["breed"] = "unknown"
+        prediction["status"] = "review"
+        prediction["reason"] = "other_animal_class:" + animal_label
+        proposals.append({
+            "detection_confidence": float(box.conf.item()),
+            "x1": x1, "y1": y1, "x2": x2, "y2": y2,
+            **prediction,
+        })
+    return deduplicate_pets(proposals)
 
 
 def classify_pets(result, image, classifier):
