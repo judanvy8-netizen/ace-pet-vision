@@ -8,7 +8,7 @@ if not exist "%ACE_PYTHON%" (
   pause
   exit /b 1
 )
-"%ACE_PYTHON%" "source\main.py" %*
+"%ACE_PYTHON%" "source\main-3.py" %*
 set "ACE_RUN_EXIT=%ERRORLEVEL%"
 if not "%ACE_RUN_EXIT%"=="0" echo [ACE] Execution failed. Read the message above.
 pause

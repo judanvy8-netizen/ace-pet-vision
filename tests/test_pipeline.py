@@ -11,7 +11,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "source"))
 from shared import common, pet_model
-import main as app
+import importlib.util
+
+# 교사 원본 main.py는 수정하지 않고, 현재 개선본 main-3.py를 검증합니다.
+spec = importlib.util.spec_from_file_location("ace_current_main", ROOT / "source" / "main-3.py")
+app = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(app)
 
 
 class PipelineTests(unittest.TestCase):
