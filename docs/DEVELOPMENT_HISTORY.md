@@ -18,7 +18,8 @@
 | 1 | `source/main.py`, `shared/common.py:image_files`, `read_image` | 입력 폴더 사진을 순서대로 읽음. 없는 경로·손상 이미지 오류 구분 |
 | 2 | `shared/common.py:yolo` | YOLO11n으로 cat(15), dog(16) 박스 탐지 |
 | 3 | `shared/common.py:yolo_rescue` | 기본 탐지 0마리면 YOLO11s를 불러 재검사. 모든 사진에서 무거운 모델을 돌리지 않음 |
-| 4 | `source/main.py --deep-rescue` | **선택사항:** 재검사 실패 시 1280px·TTA(`augment=True`)로 추가 탐지 시도. CPU에서 느리며 성공은 보장하지 않음 |
+| 4 | `source/main.py` 자동 보완 | YOLO11s도 미탐이면 1280px·TTA(`augment=True`)로 **기본 자동 재검사**. 추가 인수 필요 없음 |
+| 4-1 | `shared/common.py:yolo_strong`, `zoomed_pet_rescue` | 여전히 0마리이면 YOLO11m 전체 이미지 및 겹치는 확대 크롭을 검사. 기본 `main.py` 호출에 포함, 좌표는 원본으로 복원 |
 | 5 | `shared/common.py:classify_pets` + `shared/pet_model.py:BreedClassifier` | 검출한 동물 영역을 크롭하고 ResNet50으로 37품종 후보를 판별 |
 | 6 | `shared/common.py:deduplicate_pets` | 전신/얼굴이 중복 검출돼 한 마리를 두 마리로 세는 문제 완화 |
 | 7 | `shared/visualizer.py:annotate` | 박스·후보 품종·점수·마릿수를 결과 이미지에 표시 |
@@ -61,7 +62,7 @@
 | [`4a6b013`](https://github.com/judanvy8-netizen/ace-pet-vision/commit/4a6b013cb2b4657cfaccaf52cf19b9701b139e3f) | 16번 사모예드·19번 스핑크스가 **0마리로 미탐** | 기본 YOLO11n 실패 시 더 큰 YOLO11s(960px, conf 0.18) 재검사, 추가 테스트 |
 | [`60f847e`](https://github.com/judanvy8-netizen/ace-pet-vision/commit/60f847e662b523dcd1bf8f0a5e8cb138b79fedf4) | 재검사 후에도 16·19번 실패 | 선택형 `--deep-rescue` (YOLO11s 고해상도+TTA), `--single-pet-review` (인간 확인 전제 ResNet 분류 검토) 추가. `source_url` 열도 추가 |
 
-**실제 확인과 제한:** 조장은 최신 코드를 IntelliJ에 `git pull --ff-only`로 반영해 다시 실행했고, **중복 탐지 문제는 해결**됐다고 보고했습니다. 반면 **16·19번 미탐지는 YOLO11s 재검사까지는 해결되지 않았음**을 확인했습니다. 고해상도 TTA와 전체 사진 분류 옵션의 실사진 개선 여부는 **아직 확인되지 않았습니다**.
+**실제 확인과 제한:** 조장은 IntelliJ에서 **중복 탐지 문제가 해결**됐다고 확인했습니다. 추가 실행에서 **19번 스핑크스는 탐지됐으나 16번 사모예드는 계속 0마리**라고 보고했습니다. 따라서 고해상도 TTA만으로 16번을 해결했다고 주장하지 않습니다. 이후 YOLO11m과 확대 크롭을 기본 실행에 통합했지만 **새 방식이 실제 16번을 잡는지는 확인 전**입니다.
 
 ## 4. 기술적 선택의 근거
 
@@ -73,23 +74,29 @@
 
 ## 5. 검증 결과·남은 과제
 
-- **모의 단위/통합 테스트:** 기존 10개에 출처 매핑·고해상도 재탐지·검토 전용 품종 분류 테스트를 추가해 **13개 통과**. 가짜 탐지·분류 모델을 사용했으므로 **실제 37품종 정확도 수치가 아님**.
-- **사용자 확인 결과:** 05·07번 중복 문제 해결. 16·19번 기본/YOLO11s의 0마리 문제 여전함.
-- **다음 실험:** 16·19번을 `--deep-rescue`로 다시 실행하고, 여전히 실패하면 `--single-pet-review`로 분류 후보만 확인. `review_only`는 '동물 위치 검출 성공'으로 기록하지 않음.
+- **모의 단위/통합 테스트:** 기존 13개에 자동 고해상도 재검사·YOLO11m 확대 검사 경로·확대 박스 좌표 복원 테스트 3개를 추가해 **16개 통과**. 검출·분류 모델은 모의 객체를 사용했으므로 **실제 37품종 정확도나 16번 검출 성공을 뜻하지 않음**.
+- **사용자 확인 결과:** 05·07번 중복 문제 해결, 19번 추가 검사는 탐지 성공, 16번은 이전 재검사까지 여전히 0마리.
+- **다음 실험:** IntelliJ에서 `source/main.py`를 **그냥 Run**하여 16번 사모예드 결과(`outputs/16_dog_samoyed_pets.jpg` 및 CSV의 `detector`) 확인. 자동 YOLO11m·확대 검사도 0마리라면 미탐 사례로 기록하고 모델 성능 개선을 별도 검토. 파일명이나 정답표로 예측을 꾸미지 않음.
 - **평가 자료:** `data/ground_truth.csv`의 20장 실제 개수, `test_cases.csv`의 관찰 결과, 동물 없음·혼합/가림 사례, 실패 사례 3개 이유 및 조건을 **사람이 확인하여 기록**해야 함.
 - **발표 윤리:** 조장이 통합 구현한 코드라도 팀원별로 실제로 맡아 설명·수정·테스트한 내용을 구별해 제출합니다.
 
-## 6. 실제 실행 예시
+## 6. IntelliJ에서 실행하는 방법 — 별도 옵션이나 결과 폴더 불필요
+
+프로젝트 `C:\KSW\ace-pet-vision`을 IntelliJ에서 열고 `source/main.py` 우클릭 → **Run 'main'** 하면 기본 사진 20장을 자동 분석합니다. 또는 터미널에서 다음 두 명령만 사용합니다.
 
 ```powershell
-# 코드 최신화
- git pull --ff-only
-# 기존 이미지 20장 기본 처리
- .\run.bat --limit 0
-# 16번 미탐지 고해상도·TTA 확인
- .\run.bat --input data/images/16_dog_samoyed.jpg --deep-rescue --output outputs/check_16
-# 사람의 '사진 안에 동물 한 마리' 확인이 전제된 품종 검토 모드
- .\run.bat --input data/images/19_cat_sphynx.jpg --single-pet-review --output outputs/review_19
+git pull --ff-only
+.\run.bat
 ```
 
-**참고:** 같은 `--output` 경로로 재실행하면 CSV가 갱신됩니다. 실험을 비교하려면 출력 폴더를 분리하세요.
+기존과 똑같이 `outputs/pet_counts.csv`, `outputs/pet_breeds.csv`와 사진별 `*_pets.jpg`가 저장됩니다. **새로운 `outputs/check_16`이나 `review_19` 폴더를 만들지 않습니다.**
+
+최신 YOLO11m 가중치는 기존 2개 탐지기가 모두 실패한 경우에만 자동 다운로드됩니다(약 41MB, 공식 SHA-256 검증). 실사진에서 검출이 없으면 예측을 만들어 내지 않고 미탐으로 남깁니다.
+
+## 7. 2026-10-28 후속 개선 — 16번 미탐지와 자동 실행
+
+- **사용자 피드백:** 19번 스핑크스는 탐지되었고, 16번 사모예드는 계속 탐지 실패. 별도 옵션 실행과 별도 결과 폴더 사용 대신 **메인만 실행하면 자동 처리**되도록 변경 요청.
+- [자동 재검사 코드](https://github.com/judanvy8-netizen/ace-pet-vision/commit/9d2b694703456ae31ab5d1a308fe04f37492e635): 기본 YOLO11n → YOLO11s → YOLO11s 고해상도 TTA → YOLO11m 전체 이미지·겹치는 확대 크롭 검사. 추가 검출 모델은 0마리일 때만 로드, 사진별 결과 경로는 그대로 유지.
+- [자동 테스트 보강](https://github.com/judanvy8-netizen/ace-pet-vision/commit/880ae85e0feb712469e76f531a8fb2cf6116eb1e): 옵션 없는 `main()` 자동 보완, 최종 확대 검사 호출과 원래 이미지 좌표 보존을 검증하는 테스트 3개 추가, 총 16개 통과.
+- [사용법 업데이트](https://github.com/judanvy8-netizen/ace-pet-vision/commit/7ac7fa61b4d9056df716418f2e55b47fa4075c93): README에서 별도 실행 옵션·추가 결과 폴더 사용 예시를 제거하고 기본 메인 실행 중심으로 정리.
+- **증거 수준:** 모의 객체로 확인한 실행 흐름은 통과했지만 이 환경에는 실제 YOLO 가중치가 없어 **16번 사모예드의 검출 성공 여부를 실측하지 못함**. 향후 실제 IntelliJ 결과로 판단해야 함.
