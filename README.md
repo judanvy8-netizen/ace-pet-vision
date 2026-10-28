@@ -24,6 +24,9 @@ ace-pet-vision/
 │  └─ main.py              # 직접 실행하는 파일
 ├─ tests/
 ├─ test_cases.csv
+├─ docs/
+│  ├─ DEVELOPMENT_HISTORY.md  # 개발·수정 근거
+│  └─ KAKAO_DAILY_MINUTES.md  # 카카오톡 일별 회의록
 ├─ requirements.txt
 ├─ setup.bat
 ├─ setup_env.py
@@ -50,6 +53,25 @@ ace-pet-vision/
 먼저 `run.bat --prepare-models`로 YOLO11n, YOLO11s와 ResNet50 가중치 다운로드·해시 검증을 확인할 수 있습니다. 그 다음 `run.bat --input data/images/03_dog_beagle.jpg --limit 1`로 **실제 품종 모델까지** 단일 사진을 테스트하세요. `outputs/pet_counts.csv`, `outputs/pet_breeds.csv`, `outputs/03_dog_beagle_pets.jpg`가 생성되는지 확인합니다. 이상이 없다면 `run.bat --limit 0`으로 20장을 검사합니다. Windows 배치 파일의 `pause`는 정상 동작이며, IntelliJ에서 직접 실행하는 경우에는 추가 인수 없이 기본 20장을 처리합니다.
 
 기본 입력은 `data/images`, 기본 처리 수는 처음 20장입니다. `--limit 0`은 전체입니다.
+
+### 16·19번 미탐지 사진 추가 확인
+
+기본 YOLO11n·YOLO11s에서 모두 0마리라면, 아래처럼 고해상도 TTA 재탐지를 시도할 수 있습니다. CPU에서 느리며 결과 개선은 실제 사진으로 확인해야 합니다.
+
+```powershell
+.\run.bat --input data/images/16_dog_samoyed.jpg --deep-rescue --output outputs/check_16
+.\run.bat --input data/images/19_cat_sphynx.jpg --deep-rescue --output outputs/check_19
+```
+
+그래도 실패하고 **사람이 사진마다 동물 한 마리가 있다고 직접 확인했다면**, 다음은 검출이 아닌 **분류 후보 검토용**으로만 사용할 수 있습니다.
+
+```powershell
+.\run.bat --input data/images/16_dog_samoyed.jpg --single-pet-review --output outputs/review_16
+.\run.bat --input data/images/19_cat_sphynx.jpg --single-pet-review --output outputs/review_19
+```
+
+`--single-pet-review`는 **YOLO가 동물을 검출했다는 뜻이 아닙니다.** ResNet50이 사진 전체에서 품종 후보를 추정하며, 결과에 `review_only` / `REVIEW: NOT YOLO DETECTED`가 표시됩니다. 실제 객체 탐지 정확도에는 포함하지 마세요. 동물이 없는 사진이나 여러 마리가 있는 사진에는 이 옵션을 사용하지 않습니다.
+
 사진 한 장: `.\run.bat --input data/images/03_dog_beagle.jpg`.
 탐지 기준 비교: `.\run.bat --conf 0.5`.
 기존 `--samples` 명령도 같은 20장 사진을 사용합니다.
@@ -80,7 +102,7 @@ outputs/
 사진 위쪽에 Dogs/Cats 수, 동물마다 박스·품종 후보·점수를 표시합니다. 점수가 낮거나 종이 불일치하면 보류합니다.
 **중복 탐지 보정:** 같은 동물의 전신·얼굴 박스처럼 크게 겹치는 박스는 한 마리로 셉니다. 실제 동물 두 마리가 겹친 사진은 수작업 검증이 필요합니다.
 **미탐지 보완:** YOLO11n이 0마리를 탐지한 사진만 YOLO11s를 입력 크기 960, 신뢰도 0.18로 재검사합니다. 개선을 시도하지만 모든 오탐·미탐이 해결된다는 보장은 없습니다. CPU에서 느리거나 추가 모델 다운로드가 어려우면 `run.bat --no-rescue`로 끌 수 있고 `--rescue-conf 0.25`처럼 기준을 조절할 수 있습니다.
-`pet_counts.csv`에는 사진별 cat/dog 수, 정답과 개수 오차, 처리 상태 및 사용 탐지 모델(`detector`)이 기록됩니다.
+`pet_counts.csv`에는 사진별 cat/dog 수, 정답과 개수 오차, 처리 상태 및 사용 탐지 모델(`detector`)이 기록됩니다. 사진 출처는 **`source_url` 열**에 나타나며 `data/metadata.csv`의 `source_page` 주소를 가져옵니다. 출처가 없는 사진은 빈칸으로 표시합니다.
 `pet_breeds.csv`에는 동물별 품종 후보가 기록됩니다. 오류는 `errors.log`에서 확인합니다.
 
 같은 이름의 결과는 다시 실행하면 갱신합니다. 이전 결과를 보관하려면 복사하거나 `--output outputs/experiment_02`로 별도 경로를 지정하세요.
@@ -106,3 +128,9 @@ outputs/
 - [사진 출처](data/SOURCES.md), [품종·출처 표](data/metadata.csv)
 
 자동 검사: `.venv\Scripts\python.exe -m unittest discover -s tests -v`. 이 테스트는 모델 호출을 대체하는 단위·통합 흐름 테스트이며 **실제 가중치로 20장을 실행한 결과는 아닙니다.** 반드시 별도로 IntelliJ에서 실제 모델을 실행하고 결과를 확인하세요.
+
+## 별도 기록 문서
+
+- [개발 과정 기록](docs/DEVELOPMENT_HISTORY.md): 코드 변경 내역, 수정 이유, 실제 확인 결과와 미검증 상태
+- [카카오톡 일별 회의록](docs/KAKAO_DAILY_MINUTES.md): 10월 24~28일 단체 대화에서 확인된 논의 내용
+- 조원별 개인 코드 설명서 파일은 별도로 제공하며 공개 GitHub에는 올리지 않았습니다.
