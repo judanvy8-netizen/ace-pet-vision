@@ -1,3 +1,4 @@
+# [설명] 통합 흐름 모의 테스트: AI 가중치 없이 호출 순서·예외·저장을 재현합니다. 실제 사진 정확도와 다릅니다.
 from pathlib import Path
 import csv
 import hashlib
@@ -19,6 +20,7 @@ app = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(app)
 
 
+# [설명] 입력, 모델 로드 실패, 중복 탐지·추가 검사·출력 저장이 연결되는지 검증합니다.
 class PipelineTests(unittest.TestCase):
     def test_breed_rejection(self):
         names = ["Beagle", "Siamese", "Pug"]
@@ -80,6 +82,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(classifier.classes, EXPECTED_CLASSES)
         fake_model.load_state_dict.assert_called_once_with(checkpoint["model_state"], strict=True)
 
+    # [설명] 모델 초기화 실패 시 이전 CSV가 지워지지 않는지 확인합니다.
     def test_model_startup_failure_does_not_erase_existing_csv(self):
         from PIL import Image
         with tempfile.TemporaryDirectory() as directory:
@@ -138,6 +141,7 @@ class PipelineTests(unittest.TestCase):
                              ("0", "1", "ok"))
             self.assertTrue((output / "dog_pets.jpg").is_file())
 
+    # [설명] 05·07 중복 박스는 합치면서 서로 다른 동물을 잘못 합치지 않는지 확인합니다.
     def test_nested_duplicate_prefers_stronger_breed_and_keeps_other_animals(self):
         from shared.common import deduplicate_pets
         def pet(species, box, breed, confidence, detection=.8, status="classified"):
@@ -161,6 +165,7 @@ class PipelineTests(unittest.TestCase):
         dog = pet("dog", (103, 67, 598, 548), "Beagle", .76)
         self.assertEqual(len(deduplicate_pets([big, dog])), 2)
 
+    # [설명] 기본 검출 결과가 0일 때만 YOLO11s 경로를 호출하는지 확인합니다.
     def test_rescue_only_for_images_without_detections(self):
         from types import SimpleNamespace
         from PIL import Image

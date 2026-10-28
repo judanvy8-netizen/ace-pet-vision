@@ -1,3 +1,4 @@
+# [설명] 수기 정답표 테스트: 제목 없는 5열 CSV가 개·고양이 숫자와 함께 정상 해석되는지 확인합니다.
 """수기로 작성한 정답표의 새 5열 형식과 이전 형식 호환 검사."""
 from pathlib import Path
 import tempfile
@@ -5,6 +6,7 @@ import unittest
 from shared.truth_reader import read_ground_truth
 
 
+# [설명] 파일명 중복·음수 개수·종 불일치 등을 막아 정답표의 신뢰성을 지킵니다.
 class TruthReaderTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -14,6 +16,7 @@ class TruthReaderTests(unittest.TestCase):
     def write(self, content):
         self.path.write_text(content, encoding="utf-8-sig")
 
+    # [설명] 선생님 수기 형식인 제목 없는 5열 CSV를 정상 처리하는지 확인합니다.
     def test_headerless_five_columns(self):
         self.write("img_001.jpg,고양이,1,0,고양이 한 마리\n"
                    "img_002.jpg,개,0,1,개 한 마리\n")

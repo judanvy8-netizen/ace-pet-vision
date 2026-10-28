@@ -1,3 +1,4 @@
+# [설명] 품종·종 교차 판단 테스트: 스핑크스·치와와 모의 점수로 오류 교정 기준을 검사합니다.
 import unittest
 import sys
 import csv
@@ -19,10 +20,12 @@ import main as app
 
 CLASSES = ["Bengal", "Chihuahua", "Sphynx", "Beagle"]
 
+# [설명] YOLO와 ResNet의 의견 차이·저신뢰·추가 관점 추론 분기를 검사합니다.
 class FusionTests(unittest.TestCase):
     def choose(self, probabilities, yolo_species):
         return choose_supported_breed(probabilities, CLASSES, yolo_species, .50, CAT_BREEDS)
 
+    # [설명] 스핑크스처럼 종이 충돌할 때 확정 오답 대신 REVIEW로 표시되는지 시험합니다.
     def test_sphynx_95_corrects_yolo_dog_to_cat_review(self):
         result = self.choose([.01, .02, .95, .02], "dog")
         self.assertEqual((result["species"], result["candidate_breed"], result["reason"]),
@@ -84,6 +87,7 @@ class FusionTests(unittest.TestCase):
         self.assertEqual(uncertain["species"], "dog")
         self.assertEqual(uncertain["initial_top_breed"], "Bengal")
 
+    # [설명] 가로로 긴 사진의 비율 유지 추가 관점이 선택되는지 확인합니다.
     def test_wide_chihuahua_photo_uses_ratio_preserving_variant(self):
         """500x231 같은 사진은 비율을 유지한 추가 관점으로도 검사합니다."""
         obj = object.__new__(BreedClassifier)

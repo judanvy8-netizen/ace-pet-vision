@@ -1,3 +1,4 @@
+# [설명] 정답 비교 규칙 테스트: REVIEW와 정상 탐지의 숫자를 섞지 않고 저장하는지 확인합니다.
 import csv
 import tempfile
 import unittest
@@ -5,6 +6,7 @@ from pathlib import Path
 from shared.evaluation import summarize_evaluation, write_evaluation
 
 
+# [설명] 수기 정답의 빈칸 처리·오차 계산·정상 및 REVIEW 지표 분리를 검사합니다.
 class EvaluationTests(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
@@ -96,6 +98,7 @@ class EvaluationTests(unittest.TestCase):
         self.assertEqual(stats["final_count_scored"], 0)
         self.assertEqual(rows[0]["final_count_check"], "최종 개수 평가 제외")
 
+    # [설명] 엄격한 탐지 개수와 교차 판정 개수 일치가 각각 보고되는지 확인합니다.
     def test_report_shows_strict_and_review_aware_metrics(self):
         counts = [
             dict(filename="dog.jpg", cat=0, dog=1, status="ok", detector="yolo11n"),
