@@ -42,3 +42,17 @@
 - `outputs/`: 실행할 때 결과 이미지·`pet_counts.csv`·`pet_breeds.csv` 생성. 3단계는 `검증_상세.csv`·`검증_요약.md`도 생성.
 
 **선생님 필수:** 7명 모두 **자신이 직접 수정한 코드 1건과 함수 설명 1개**를 남겨야 합니다. 역할 배정이 개인 구현 완료를 의미하지는 않습니다. 선택 기능은 교사와 협의합니다.
+
+## 개·고양이 혼합 사진 4장 — 별도 테스트
+
+- `data/mixed_samples/mix_01.webp` ~ `mix_04.webp`: 대화 캡처의 2×2 이미지에서 각 칸을 분리한 약 117×117픽셀 테스트용 사진. 원본 이미지가 아니며 AI 생성 여부와 저작권·사용 허가는 확인되지 않았습니다.
+- `data/mixed_ground_truth.csv`: **제목 행 없는 5열 수기 마릿수 정답표**. 네 장 모두 고양이 1마리·개 1마리입니다. 품종 정답이나 모델 실행 결과를 뜻하지 않습니다.
+- 원래 20장과 섞이지 않도록 별도 입력 폴더에 보관합니다. 이 샘플은 실제 모델 추론이 **아직 미검증**이며 낮은 해상도 때문에 원본보다 탐지가 어려울 수 있습니다.
+- 실제 모델로 실행하려면 Windows에서 아래 명령을 사용하고 각 사진의 두 개체에 모두 박스가 그려졌는지 결과 이미지로 직접 확인합니다.
+
+```powershell
+.\.venv\Scripts\python.exe source\main-3.py --input data\mixed_samples --truth data\mixed_ground_truth.csv --output outputs\mixed_samples --limit 0
+```
+
+- 결과: `outputs/mixed_samples/pet_counts.csv`, `pet_breeds.csv`, `mix_01_pets.jpg` ~ `mix_04_pets.jpg`. 개·고양이 중 한 종류만 검출되면 현재 추가 탐지 단계가 자동 실행되지 않을 수 있어 검토가 필요합니다.
+- `tests/test_mixed_pets.py`: 모델 다운로드 없이 입력 파일·정답표 및 개/고양이 2개 박스의 분리 처리를 모의 검증합니다. 이 모의 테스트 통과를 실제 YOLO/ResNet50 정확도로 해석하면 안 됩니다.
