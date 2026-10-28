@@ -2,11 +2,11 @@
 01_cat_abyssinian.jpg,,,,
 02_dog_basset_hound.jpg,,,,
 03_dog_beagle.jpg,,,,
-04_cat_bengal.jpg,,,,
-05_cat_birman.png,,,,
+04_cat_bengal.jpg,1,0,고양이만,사용자 공유 화면에서 고양이 1마리 확인; 2026-10-28 벵갈 문제 해결 보고
+05_cat_birman.png,1,0,고양이만,사용자 공유 화면에서 고양이 1마리 확인; 중복 탐지 2→1 해결 보고
 06_dog_boxer.jpg,,,,
-07_cat_british_shorthair.png,,,,
-08_dog_chihuahua.jpg,,,,
+07_cat_british_shorthair.png,1,0,고양이만,사용자 공유 화면에서 고양이 1마리 확인; 중복 탐지 2→1 해결 보고
+08_dog_chihuahua.jpg,0,1,개만,사용자 공유 화면에서 개 1마리 확인; 품종 분류 문제 해결 완료 보고. 개선 후 점수는 미제공
 09_dog_english_setter.jpg,,,,
 10_cat_maine_coon.jpg,,,,
 11_cat_persian.jpg,,,,
@@ -14,8 +14,8 @@
 13_dog_pug.jpg,,,,
 14_cat_ragdoll.jpg,,,,
 15_cat_russian_blue.jpg,,,,
-16_dog_samoyed.jpg,,,,
+16_dog_samoyed.jpg,0,1,개만·일부가림,"사용자 공유 화면에서 개 1마리 확인; YOLO bear / ResNet Samoyed 82.4%, REVIEW 결과"
 17_dog_shiba_inu.jpg,,,,
 18_cat_siamese.jpg,,,,
-19_cat_sphynx.jpg,,,,
+19_cat_sphynx.jpg,1,0,고양이만·특이자세,"사용자 공유 화면에서 고양이 1마리 확인; YOLO dog / ResNet Sphynx 94.9%, 종 교정 REVIEW"
 20_dog_yorkshire_terrier.jpg,,,,
