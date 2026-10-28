@@ -71,7 +71,7 @@ def main(argv=None):
     if len(ids) != 2:
         raise ValueError("YOLO 모델에 cat/dog 탐지 클래스가 모두 필요합니다.")
     output.mkdir(parents=True, exist_ok=True)
-    logging.basicConfig(filename=output / "errors.log", filemode="w", level=logging.ERROR, encoding="utf-8", force=True)
+    logging.basicConfig(filename=output / "errors.log", filemode="w", level=logging.WARNING, encoding="utf-8", force=True)
     rows, breeds, used = [], [], set()
     save_csv(output / "pet_counts.csv", COUNT_FIELDS, rows)
     save_csv(output / "pet_breeds.csv", BREED_FIELDS, breeds)
@@ -127,6 +127,13 @@ def main(argv=None):
                             if pets:
                                 detector_name = "yolo11m_other_animal_review"
                         if not pets:
+                            # Store actual raw labels for diagnosis, not guessed causes.
+                            raw_labels = [
+                                f'{strong_result.names[int(box.cls.item())]}:{float(box.conf.item()):.3f}'
+                                for box in strong_result.boxes
+                            ]
+                            logging.warning("%s: YOLO11m detected labels before filtering: %s",
+                                            filename, ", ".join(raw_labels[:12]) or "(none)")
                             pets = zoomed_pet_rescue(image, strong_model, classifier)
                             detector_name = ("yolo11m_zoomed_other_animal_review"
                                              if pets and any(p.get("reason", "").startswith("other_animal_class:")
@@ -137,6 +144,7 @@ def main(argv=None):
                         # no_detection output and surface the warning.
                         logging.warning("추가 탐지 모델 준비/실행 실패: %s - %s", filename, extra_error)
                         row["error"] = "추가 탐지 실패: " + str(extra_error)
+                        print(f"  [경고] {filename}: YOLO11m 추가 검사 실패 — {extra_error}", flush=True)
                         detector_name = "yolo11m_unavailable"
             if not pets and args.single_pet_review:
                 # The user explicitly confirms exactly one animal in this photo.
@@ -149,6 +157,7 @@ def main(argv=None):
             result_status = ("review_only" if detector_name == "resnet_single_pet_review"
                              else "review_detection" if any(
                                  p.get("reason", "").startswith("other_animal_class:") for p in pets)
+                             else "partial_error" if row["error"] and not pets
                              else "ok" if pets else "no_detection")
             row.update(**counts, status=result_status, detector=detector_name,
                        result_image=target.as_posix())
@@ -173,7 +182,7 @@ def main(argv=None):
         save_csv(output / "pet_counts.csv", COUNT_FIELDS, rows)
         save_csv(output / "pet_breeds.csv", BREED_FIELDS, breeds)
     print(f"결과: {output}")
-    return int(any(row["status"] == "error" for row in rows))
+    return int(any(row["status"] in ("error", "partial_error") for row in rows))
 
 
 if __name__ == "__main__":
