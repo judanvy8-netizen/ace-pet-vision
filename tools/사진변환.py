@@ -1,4 +1,8 @@
-"""원래 PNG인 05·07번을 JPG로 변환하고 사진 메타데이터를 고칩니다."""
+"""교사 파일명 img_###.jpg 준수: 두 PNG 내용을 실제 JPEG로 바꿉니다.
+
+다른 파일은 건드리지 않습니다. 이미 변환된 JPEG라면 아무 일도 하지 않습니다.
+변환 뒤 metadata.csv의 실제 파일 길이·SHA256·변경 사유를 갱신합니다.
+"""
 from pathlib import Path
 from PIL import Image
 import csv
@@ -10,50 +14,57 @@ META = ROOT / "data" / "metadata.csv"
 
 def convert_photos():
     changed = []
-    for n in (5, 7):
-        src = IMAGES / f"img_{n:03d}.png"
-        dst = IMAGES / f"img_{n:03d}.jpg"
-        if not src.exists():
-            continue
-        if dst.exists():
-            raise FileExistsError(str(dst))
-        with Image.open(src) as image:
-            if image.mode in ("RGBA", "LA") or "transparency" in image.info:
-                rgba = image.convert("RGBA")
-                background = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
-                background.alpha_composite(rgba)
-                rgb = background.convert("RGB")
+    for number in (5, 7):
+        jpg = IMAGES / f"img_{number:03d}.jpg"
+        png = IMAGES / f"img_{number:03d}.png"
+        source = png if png.exists() else jpg
+        if not source.exists():
+            raise FileNotFoundError(f"샘플 사진이 없습니다: {source}")
+        with Image.open(source) as original:
+            if original.format == "JPEG" and source == jpg:
+                continue
+            if original.format != "PNG":
+                raise ValueError(f"예상과 다른 사진 형식: {source}")
+            if original.mode in ("RGBA", "LA") or "transparency" in original.info:
+                rgba = original.convert("RGBA")
+                white = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+                white.alpha_composite(rgba)
+                converted = white.convert("RGB")
             else:
-                rgb = image.convert("RGB")
-            rgb.save(dst, "JPEG", quality=92, optimize=True)
-        with Image.open(dst) as verify:
-            if verify.format != "JPEG":
-                raise ValueError("JPG 변환 실패: " + str(dst))
-        src.unlink()
-        changed.append(dst)
+                converted = original.convert("RGB")
+            tmp = jpg.with_suffix(".temp.jpg")
+            converted.save(tmp, format="JPEG", quality=92, optimize=True)
+        with Image.open(tmp) as verified:
+            if verified.format != "JPEG":
+                raise ValueError(f"JPG 저장 확인 실패: {tmp}")
+        tmp.replace(jpg)
+        if source == png:
+            png.unlink()
+        changed.append(jpg)
 
     if changed:
-        with META.open(encoding="utf-8-sig", newline="") as f:
-            reader = csv.DictReader(f)
+        with META.open("r", encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle)
             fields = reader.fieldnames
             rows = list(reader)
         for row in rows:
             target = IMAGES / row["filename"]
             if target not in changed:
                 continue
-            raw = target.read_bytes()
-            with Image.open(target) as img:
-                row["width"], row["height"] = str(img.width), str(img.height)
-            row["bytes"] = str(len(raw))
-            row["sha256"] = hashlib.sha256(raw).hexdigest()
-            row["modifications"] = (row.get("modifications", "") + "; PNG to JPEG quality 92").strip("; ")
-        temp = META.with_suffix(".tmp")
-        with temp.open("w", encoding="utf-8-sig", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fields)
+            content = target.read_bytes()
+            with Image.open(target) as photo:
+                row["width"] = str(photo.width)
+                row["height"] = str(photo.height)
+            row["bytes"] = str(len(content))
+            row["sha256"] = hashlib.sha256(content).hexdigest()
+            row["modifications"] = (row.get("modifications", "") + "; PNG→JPEG (quality 92)").strip("; ")
+        tmp = META.with_suffix(".temp.csv")
+        with tmp.open("w", encoding="utf-8-sig", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fields)
             writer.writeheader()
             writer.writerows(rows)
-        temp.replace(META)
-    print("변환 완료: " + (", ".join(x.name for x in changed) if changed else "이미 JPG"))
+        tmp.replace(META)
+    print("사진 JPG 확인: " + (", ".join(x.name for x in changed) if changed else "이미 완료"))
 
 if __name__ == "__main__":
     convert_photos()
