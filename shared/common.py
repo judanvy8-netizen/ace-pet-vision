@@ -18,7 +18,11 @@ COUNT_FIELDS = ["filename", "cat", "dog", "actual_cat", "actual_dog",
                 "cat_error", "dog_error", "status", "detector", "source_url", "error", "result_image"]
 BREED_FIELDS = ["filename", "object_id", "species", "breed", "candidate_breed",
                 "breed_confidence", "detection_confidence", "status", "reason",
-                "x1", "y1", "x2", "y2"]
+                "x1", "y1", "x2", "y2", "yolo_label", "yolo_species",
+                "resnet_top_breed", "resnet_top_confidence", "resnet_species",
+                "resnet_species_mass", "yolo_species_mass", "tta_used",
+                "initial_top_breed", "initial_top_confidence", "top3_global",
+                "top3_species"]
 
 
 def yolo():
@@ -202,6 +206,8 @@ def classify_animal_proposals(result, image, classifier, *, min_breed_confidence
             "detection_confidence": float(box.conf.item()),
             "x1": x1, "y1": y1, "x2": x2, "y2": y2,
             **prediction,
+            "yolo_label": animal_label,
+            "yolo_species": "other",
         })
     return deduplicate_pets(proposals)
 
@@ -219,8 +225,16 @@ def classify_pets(result, image, classifier):
         if x1 >= x2 or y1 >= y2:
             continue
         crop = Image.fromarray(cv2.cvtColor(image[y1:y2, x1:x2], cv2.COLOR_BGR2RGB))
-        breed = classifier.classify(crop, species)
-        predictions.append({"species": species, "detection_confidence": float(box.conf.item()),
+        if hasattr(classifier, "classify_with_context"):
+            padding = max(3, round(max(x2 - x1, y2 - y1) * 0.10))
+            xx1, yy1 = max(0, x1 - padding), max(0, y1 - padding)
+            xx2, yy2 = min(width, x2 + padding), min(height, y2 + padding)
+            context = Image.fromarray(cv2.cvtColor(image[yy1:yy2, xx1:xx2], cv2.COLOR_BGR2RGB))
+            breed = classifier.classify_with_context(crop, species, context)
+        else:
+            breed = classifier.classify(crop, species)
+        predictions.append({"species": species, "yolo_species": species, "yolo_label": species,
+                            "detection_confidence": float(box.conf.item()),
                             "x1": x1, "y1": y1, "x2": x2, "y2": y2, **breed})
     return deduplicate_pets(predictions)
 
@@ -272,7 +286,8 @@ def single_pet_review(image, classifier):
     rgb = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
     prediction = classifier.classify_single_pet(rgb)
     return [{"x1": 0, "y1": 0, "x2": width, "y2": height,
-             "detection_confidence": 0.0, **prediction}]
+             "detection_confidence": 0.0, **prediction,
+             "yolo_label": "no_detection", "yolo_species": "none"}]
 
 
 def read_ground_truth(path):
