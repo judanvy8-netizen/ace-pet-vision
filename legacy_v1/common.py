@@ -1,3 +1,4 @@
+# [설명] main-1 전용 과거 구현: 입력·탐지·분류 연결·저장. 단계별 변화 비교에 쓰며 최신 공통 코드를 대신하지 않습니다.
 """기본 제공 main.py의 공통 함수 규격을 구현합니다.
 원본 shared/common.py는 제공되지 않아, 확인한 호출 규격을 기준으로 작성했습니다.
 """
@@ -20,6 +21,7 @@ BREED_FIELDS = ["filename", "object_id", "species", "breed", "candidate_breed",
                 "x1", "y1", "x2", "y2"]
 
 
+# [설명] 이전 기본 탐지에서 YOLO11n을 불러와 개·고양이를 찾습니다.
 def yolo():
     os.environ.setdefault("YOLO_CONFIG_DIR", str(MODEL_DIR / "settings"))
     from ultralytics import YOLO
@@ -29,10 +31,12 @@ def yolo():
     return model
 
 
+# [설명] YOLO가 찾은 동물 영역을 37품종 모델로 보낼 준비를 합니다.
 def breed_model(confidence=BREED_CONFIDENCE):
     return BreedClassifier(model_file("oxford-pets-resnet50.pth", BREED_URL, BREED_SHA256), confidence)
 
 
+# [설명] 입력 폴더에 들어 있는 처리 가능한 이미지 목록을 만듭니다.
 def image_files(source):
     source = Path(source)
     if source.is_file():
@@ -47,6 +51,7 @@ def image_files(source):
     return files
 
 
+# [설명] 한글 파일명·이미지 회전에도 안전하게 사진을 불러옵니다.
 def read_image(path):
     image = cv2.imdecode(np.fromfile(path, dtype=np.uint8), cv2.IMREAD_COLOR)
     if image is None:
@@ -54,6 +59,7 @@ def read_image(path):
     return image
 
 
+# [설명] 원본을 수정하지 않고 결과 이미지 사본을 저장합니다.
 def save_image(path, image):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -63,6 +69,7 @@ def save_image(path, image):
     encoded.tofile(path)
 
 
+# [설명] Excel에서 결과를 확인하도록 한글 CSV를 저장합니다.
 def save_csv(path, fields, rows):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -74,6 +81,7 @@ def save_csv(path, fields, rows):
     temporary.replace(path)
 
 
+# [설명] YOLO의 개·고양이 박스마다 ResNet50 품종을 추론합니다.
 def classify_pets(result, image, classifier):
     """기본 YOLO 결과의 동물 영역을 잘라 추가 품종 모델에 전달합니다."""
     height, width = image.shape[:2]
@@ -93,11 +101,13 @@ def classify_pets(result, image, classifier):
     return sorted(predictions, key=lambda p: (p["x1"], p["y1"], p["x2"], p["y2"]))
 
 
+# [설명] 이미지에 개체 수·박스·품종을 표시합니다.
 def draw_pets(image, predictions):
     rgb = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
     return cv2.cvtColor(np.asarray(annotate(rgb, predictions)), cv2.COLOR_RGB2BGR)
 
 
+# [설명] 입력 사진명과 구분되는 결과 파일 이름을 만듭니다.
 def result_path(relative, used):
     relative = Path(relative)
     path = relative.with_name(relative.stem + "_pets.jpg")
@@ -109,4 +119,5 @@ def result_path(relative, used):
     return path
 
 # 세 버전 모두 동일한 수기 정답표 형식(제목 없는 CSV)을 읽습니다.
+# [설명] 1·2·3단계가 같은 수기 정답표를 읽도록 공통 입력 모듈을 사용합니다.
 from shared.truth_reader import read_ground_truth

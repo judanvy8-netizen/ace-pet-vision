@@ -1,4 +1,5 @@
 @echo off
+rem [설명] 처음 실행할 때 Python 3.11 가상환경을 준비합니다.
 setlocal
 cd /d "%~dp0"
 echo [ACE] Python 3.11 environment setup

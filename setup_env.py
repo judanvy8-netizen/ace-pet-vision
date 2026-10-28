@@ -1,3 +1,4 @@
+# [설명] 팀원별 Python 실행환경 준비: 같은 버전의 패키지와 가상환경을 설치합니다.
 """Create this project's Python 3.11 environment. Run setup.bat on Windows."""
 import argparse
 import json
@@ -10,15 +11,18 @@ import venv
 ROOT = Path(__file__).resolve().parent
 
 
+# [설명] 가상환경 설치에 필요한 시스템 명령을 실행합니다.
 def run(command):
     subprocess.run([str(item) for item in command], cwd=ROOT, check=True)
 
 
+# [설명] Python 3.11·64비트 실행 조건을 확인합니다.
 def check_python():
     if sys.version_info[:2] != (3, 11) or struct.calcsize("P") != 8:
         raise RuntimeError("64-bit Python 3.11 is required. Run setup.bat or use py -3.11 setup_env.py.")
 
 
+# [설명] 조원마다 사용할 같은 Python 가상환경을 준비합니다.
 def ensure_environment(root):
     """Reuse a valid environment; never delete or replace an existing folder."""
     env = root / ".venv"
@@ -43,6 +47,7 @@ def ensure_environment(root):
     return python
 
 
+# [설명] requirements.txt의 AI 실행 패키지를 설치합니다.
 def install_dependencies(python):
     pip = [python, "-m", "pip", "--disable-pip-version-check", "--no-cache-dir"]
     print("[2/3] Installing CPU libraries. Internet access is required...", flush=True)
@@ -52,6 +57,7 @@ def install_dependencies(python):
     run([*pip, "install", "-r", ROOT / "requirements.txt", "--timeout", "60"])
 
 
+# [설명] 설치된 모듈이 실행 가능한지 검사합니다.
 def verify_environment(python):
     print("[3/3] Checking installed libraries...", flush=True)
     run([python, "-m", "pip", "check"])
@@ -62,6 +68,7 @@ def verify_environment(python):
          "print('OpenCV:',cv2.__version__); print('Environment ready.')"])
 
 
+# [설명] Python 확인부터 패키지 설치까지 설정 절차를 연결합니다.
 def main():
     parser = argparse.ArgumentParser(description="Set up ACE's Python 3.11 virtual environment")
     parser.add_argument("--venv-only", action="store_true", help="Create/reuse .venv without installing packages")

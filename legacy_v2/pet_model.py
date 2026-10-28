@@ -1,3 +1,4 @@
+# [설명] main-2 전용 과거 구현: ResNet50 모델 로딩과 37품종 분류. 단계별 변화 비교에 쓰며 최신 공통 코드를 대신하지 않습니다.
 """AI 처리: 모델 다운로드 → 동물 탐지 → 크롭 → 37품종 분류."""
 import hashlib
 from pathlib import Path
@@ -20,6 +21,7 @@ YOLO_SHA256 = "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1"
 # SHA-256 verified against Ultralytics/assets official v8.4.0 release metadata.
 YOLO_S_URL = "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo11s.pt"
 YOLO_S_SHA256 = "85a76fe86dd8afe384648546b56a7a78580c7cb7b404fc595f97969322d502d5"
+# [설명] 다운로드된 모델 가중치의 SHA-256으로 무결성을 검사합니다.
 def sha256(path):
     digest = hashlib.sha256()
     with Path(path).open("rb") as handle:
@@ -28,6 +30,7 @@ def sha256(path):
     return digest.hexdigest()
 
 
+# [설명] 해시 검증을 통과한 가중치만 보관해 파일 손상을 막습니다.
 def download_verified(url, destination, expected_hash):
     """가중치를 검증한 뒤 원자적으로 교체. 손상된 다운로드를 모델로 읽지 않습니다."""
     destination = Path(destination)
@@ -56,6 +59,7 @@ def download_verified(url, destination, expected_hash):
     return destination
 
 
+# [설명] 사전학습 모델을 저장하거나 기존 파일을 재사용합니다.
 def model_file(filename, url, checksum):
     """기존 models 파일을 재사용하고, 모델은 shared/models에 모읍니다."""
     destination = MODEL_DIR / filename
@@ -66,6 +70,7 @@ def model_file(filename, url, checksum):
     return download_verified(url, destination, checksum)
 
 
+# [설명] 실행에 필요한 모델을 미리 다운로드해 확인합니다.
 def prepare_models():
     return (
         model_file("yolo11n.pt", YOLO_URL, YOLO_SHA256),
@@ -88,6 +93,7 @@ EXPECTED_CLASSES = (
 )
 
 
+# [설명] 이전 품종 분류 방식에서 낮은 점수·종 불일치를 검토 상태로 표시합니다.
 def choose_breed(probabilities, classes, species, threshold):
     """37개 전체 softmax 값을 사용하며, 종별 재정규화를 하지 않습니다."""
     order = sorted(range(len(classes)), key=lambda i: float(probabilities[i]), reverse=True)
@@ -101,7 +107,9 @@ def choose_breed(probabilities, classes, species, threshold):
 
 
 
+# [설명] YOLO에서 자른 이미지를 Oxford 37품종으로 분류합니다.
 class BreedClassifier:
+    # [설명] ResNet50 체크포인트·품종 순서를 검사하고 추론 준비를 합니다.
     def __init__(self, weights_path, confidence=BREED_CONFIDENCE):
         import torch
         from torchvision import models, transforms
@@ -125,6 +133,7 @@ class BreedClassifier:
         ])
         self.confidence = confidence
 
+    # [설명] 동물 영역을 전처리해 품종 후보를 계산합니다.
     def classify(self, crop, species):
         import torch
         tensor = self.transform(crop).unsqueeze(0)

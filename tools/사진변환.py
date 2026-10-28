@@ -1,3 +1,4 @@
+# [설명] 최초 실행 정리: PNG 원본 05·07번을 실제 JPEG로 바꾸고 파일 정보·해시를 갱신합니다.
 """교사 파일명 img_###.jpg 준수: 두 PNG 내용을 실제 JPEG로 바꿉니다.
 
 다른 파일은 건드리지 않습니다. 이미 변환된 JPEG라면 아무 일도 하지 않습니다.
@@ -12,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 IMAGES = ROOT / "data" / "images"
 META = ROOT / "data" / "metadata.csv"
 
+# [설명] 확장자만 JPG였던 사진을 변환하며, 이미 JPEG인 사진은 다시 변환하지 않습니다.
 def convert_photos():
     changed = []
     for number in (5, 7):

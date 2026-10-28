@@ -1,4 +1,6 @@
 @echo off
+rem [설명] 조원의 기본 실행 진입점: 사진을 확인한 뒤 main-3.py를 실행합니다.
+rem [설명] 선생님 원본 main.py는 수정하지 않습니다.
 setlocal
 cd /d "%~dp0"
 set "ACE_PYTHON=.venv\Scripts\python.exe"

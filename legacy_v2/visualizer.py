@@ -1,3 +1,4 @@
+# [설명] main-2 전용 과거 구현: 결과 이미지의 박스·품종 표시. 단계별 변화 비교에 쓰며 최신 공통 코드를 대신하지 않습니다.
 """출력 담당: 동물 박스·품종 표시, 이미지와 CSV 저장.
 설명할 함수: annotate, save_image, write_csv.
 실습: DOG_COLOR와 CAT_COLOR를 바꾸면 박스 색상이 바뀝니다.
@@ -5,11 +6,13 @@
 
 DOG_COLOR = (50, 210, 120)
 CAT_COLOR = (80, 180, 255)
+# [설명] 개와 고양이 수를 세어 결과 이미지 위에 표시합니다.
 def animal_counts(predictions):
     return {"dog_count": sum(p["species"] == "dog" for p in predictions),
             "cat_count": sum(p["species"] == "cat" for p in predictions)}
 
 
+# [설명] 각 동물의 탐지 박스와 품종 점수·검토 문구를 그립니다.
 def annotate(image, predictions):
     from PIL import Image, ImageDraw, ImageFont
     result = image.copy()
