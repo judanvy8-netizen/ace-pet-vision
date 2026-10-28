@@ -133,6 +133,77 @@ class PipelineTests(unittest.TestCase):
                              ("0", "1", "ok"))
             self.assertTrue((output / "dog_pets.jpg").is_file())
 
+    def test_nested_duplicate_prefers_stronger_breed_and_keeps_other_animals(self):
+        from shared.common import deduplicate_pets
+        def pet(species, box, breed, confidence, detection=.8, status="classified"):
+            return dict(species=species, x1=box[0], y1=box[1], x2=box[2], y2=box[3],
+                        breed=breed, candidate_breed=breed, breed_confidence=confidence,
+                        detection_confidence=detection, status=status)
+        # 버만/브리티시 쇼트헤어 사례처럼 얼굴 박스가 전신 박스 안에 포함됨.
+        big = pet("cat", (45, 60, 780, 500), "Birman", .57)
+        small = pet("cat", (380, 60, 755, 373), "Birman", .83)
+        cats = deduplicate_pets([big, small])
+        self.assertEqual(len(cats), 1)
+        self.assertEqual(cats[0]["breed_confidence"], .83)
+        big = pet("cat", (103, 67, 598, 548), "British Shorthair", .68)
+        small = pet("cat", (267, 67, 591, 548), "Bengal", .41, status="review")
+        cats = deduplicate_pets([big, small])
+        self.assertEqual(len(cats), 1)
+        self.assertEqual(cats[0]["breed"], "British Shorthair")
+        # 서로 멀리 떨어진 두 동물은 따로 세야 합니다.
+        nearby = pet("cat", (420, 80, 790, 450), "Birman", .85)
+        self.assertEqual(len(deduplicate_pets([big, nearby])), 2)
+        dog = pet("dog", (103, 67, 598, 548), "Beagle", .76)
+        self.assertEqual(len(deduplicate_pets([big, dog])), 2)
+
+    def test_rescue_only_for_images_without_detections(self):
+        from types import SimpleNamespace
+        from PIL import Image
+        class Detector:
+            names = {15: "cat", 16: "dog"}
+            def __init__(self, kind):
+                self.kind = kind
+                self.calls = []
+            def predict(self, image, **kwargs):
+                self.calls.append(kwargs)
+                is_empty = int(image[0, 0, 0]) < 100
+                if self.kind == "primary" and is_empty:
+                    return [SimpleNamespace(names=self.names, boxes=[])]
+                return [SimpleNamespace(names=self.names, boxes=[1])]
+        def classify(result, image, classifier):
+            if not result.boxes:
+                return []
+            return [dict(species="dog", breed="Samoyed", candidate_breed="Samoyed",
+                         breed_confidence=.7, detection_confidence=.8,
+                         status="classified", reason="", x1=1, y1=1, x2=45, y2=50)]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, output = root / "images", root / "outputs"
+            source.mkdir()
+            Image.new("RGB", (90, 70), "white").save(source / "found.jpg")
+            Image.new("RGB", (90, 70), "black").save(source / "missed.jpg")
+            primary, rescue = Detector("primary"), Detector("rescue")
+            with patch.object(app, "SAMPLE_INPUT", source), patch.object(app, "OUTPUT", output), \
+                 patch.object(app, "yolo", return_value=primary), \
+                 patch.object(app, "yolo_rescue", return_value=rescue) as init_rescue, \
+                 patch.object(app, "breed_model"), patch.object(app, "classify_pets", side_effect=classify):
+                self.assertEqual(app.main([]), 0)
+            init_rescue.assert_called_once()
+            self.assertEqual(len(primary.calls), 2)
+            self.assertEqual(len(rescue.calls), 1)
+            self.assertEqual(rescue.calls[0]["imgsz"], 960)
+            self.assertEqual(rescue.calls[0]["conf"], .18)
+            with (output / "pet_counts.csv").open(encoding="utf-8-sig") as file:
+                rows = {r["filename"]: r for r in csv.DictReader(file)}
+            self.assertEqual(rows["found.jpg"]["detector"], "yolo11n")
+            self.assertEqual(rows["missed.jpg"]["detector"], "yolo11s_rescue")
+            self.assertEqual(rows["missed.jpg"]["dog"], "1")
+            with patch.object(app, "SAMPLE_INPUT", source), patch.object(app, "OUTPUT", output), \
+                 patch.object(app, "yolo", return_value=primary), \
+                 patch.object(app, "yolo_rescue", side_effect=AssertionError("should not rescue")), \
+                 patch.object(app, "breed_model"), patch.object(app, "classify_pets", side_effect=classify):
+                self.assertEqual(app.main(["--no-rescue"]), 0)
+
     def test_default_main_counts_breeds_and_corrupt_image(self):
         from PIL import Image
         class Detector:
@@ -155,7 +226,7 @@ class PipelineTests(unittest.TestCase):
             with patch.object(app, "SAMPLE_INPUT", source), patch.object(app, "OUTPUT", output), \
                  patch.object(app, "yolo", return_value=Detector()), patch.object(app, "breed_model"), \
                  patch.object(app, "classify_pets", side_effect=classify), patch.object(app.logging, "basicConfig"):
-                self.assertEqual(app.main([]), 1)
+                self.assertEqual(app.main(["--no-rescue"]), 1)
             with (output / "pet_counts.csv").open(encoding="utf-8-sig") as handle:
                 rows = {r["filename"]: r for r in csv.DictReader(handle)}
             self.assertEqual((rows["two.png"]["cat"], rows["two.png"]["dog"]), ("1", "1"))
