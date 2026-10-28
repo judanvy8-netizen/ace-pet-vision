@@ -7,7 +7,7 @@ import logging
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from shared.common import (yolo, image_files, read_image, save_image, save_csv,
-                           breed_model, classify_pets, draw_pets, result_path,
+                           breed_model, yolo_rescue, classify_pets, draw_pets, result_path,
                            read_ground_truth, COUNT_FIELDS, BREED_FIELDS)
 from shared.pet_model import prepare_models
 
@@ -32,6 +32,9 @@ def main(argv=None):
     ap.add_argument("--output", type=Path, default=OUTPUT)
     ap.add_argument("--conf", type=probability, default=0.25)
     ap.add_argument("--breed-conf", type=probability, default=0.5)
+    ap.add_argument("--no-rescue", action="store_true", help="미탐지 시 YOLO11s 재검사 끄기")
+    ap.add_argument("--rescue-conf", type=probability, default=0.18,
+                    help="미탐지 재검사의 탐지 신뢰도 기준 (기본 0.18)")
     ap.add_argument("--limit", type=int, default=20, help="처음 20장; 0이면 전체")
     ap.add_argument("--truth", type=Path, default=ROOT / "data" / "ground_truth.csv")
     ap.add_argument("--prepare-models", action="store_true")
@@ -64,22 +67,40 @@ def main(argv=None):
     rows, breeds, used = [], [], set()
     save_csv(output / "pet_counts.csv", COUNT_FIELDS, rows)
     save_csv(output / "pet_breeds.csv", BREED_FIELDS, breeds)
+    rescue_model = None  # Load the larger detector only if a photo needs rescue.
     for index, path in enumerate(files, 1):
         filename = path.relative_to(input_root).as_posix()
         row = dict.fromkeys(COUNT_FIELDS, "")
         row.update(filename=filename, status="error")
         try:
             image = read_image(path)
-            result = model.predict(image, classes=ids, conf=args.conf, device="cpu", verbose=False)[0]
+            result = model.predict(image, classes=ids, conf=args.conf, iou=0.45,
+                                   imgsz=640, device="cpu", verbose=False)[0]
             pets = classify_pets(result, image, classifier)
+            detector_name = "yolo11n"
+            if not pets and not args.no_rescue:
+                # Do not fabricate a pet; attempt another actual object detection.
+                if rescue_model is None:
+                    rescue_model = yolo_rescue()
+                rescue_ids = [i for i, name in rescue_model.names.items() if name in TARGETS]
+                if len(rescue_ids) != 2:
+                    raise ValueError("YOLO11s에 cat/dog 탐지 클래스가 모두 필요합니다.")
+                rescue_result = rescue_model.predict(
+                    image, classes=rescue_ids, conf=min(args.conf, args.rescue_conf),
+                    iou=0.45, imgsz=960, device="cpu", verbose=False,
+                )[0]
+                pets = classify_pets(rescue_result, image, classifier)
+                detector_name = "yolo11s_rescue"
             counts = {name: sum(p["species"] == name for p in pets) for name in TARGETS}
             target = result_path(filename, used)
             save_image(output / target, draw_pets(image, pets))
-            row.update(**counts, status="ok" if pets else "no_detection", result_image=target.as_posix())
+            row.update(**counts, status="ok" if pets else "no_detection", detector=detector_name,
+                       result_image=target.as_posix())
             for number, pet in enumerate(pets, 1):
                 record = {"filename": filename, "object_id": number, **pet}
                 breeds.append({key: record[key] for key in BREED_FIELDS})
-            print(f'[{index}/{len(files)}] {filename}: 개 {counts["dog"]}마리 / 고양이 {counts["cat"]}마리', flush=True)
+            print(f'[{index}/{len(files)}] {filename}: 개 {counts["dog"]}마리 / 고양이 {counts["cat"]}마리 '
+                  f'({detector_name})', flush=True)
             for pet in pets:
                 label = pet["breed"] if pet["status"] == "classified" else f'{pet["candidate_breed"]} (보류)'
                 print(f'  {pet["species"]}: {label} / 후보 점수 {pet["breed_confidence"]:.1%}')

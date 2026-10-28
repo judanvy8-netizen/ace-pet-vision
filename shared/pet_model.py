@@ -16,6 +16,9 @@ BREED_URL = f"https://huggingface.co/flaviodell/oxford-pets-resnet50/resolve/{BR
 BREED_SHA256 = "889b2d4919ea0c48cb8a89e2b25ff7c56af1bd3e1627e36b36d63c495b3842d4"
 YOLO_URL = "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo11n.pt"
 YOLO_SHA256 = "0ebbc80d4a7680d14987a577cd21342b65ecfd94632bd9a8da63ae6417644ee1"
+# SHA-256 verified against Ultralytics/assets official v8.4.0 release metadata.
+YOLO_S_URL = "https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo11s.pt"
+YOLO_S_SHA256 = "85a76fe86dd8afe384648546b56a7a78580c7cb7b404fc595f97969322d502d5"
 def sha256(path):
     digest = hashlib.sha256()
     with Path(path).open("rb") as handle:
@@ -66,6 +69,7 @@ def prepare_models():
     return (
         model_file("yolo11n.pt", YOLO_URL, YOLO_SHA256),
         model_file("oxford-pets-resnet50.pth", BREED_URL, BREED_SHA256),
+        model_file("yolo11s.pt", YOLO_S_URL, YOLO_S_SHA256),
     )
 
 

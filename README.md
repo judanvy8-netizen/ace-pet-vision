@@ -47,7 +47,7 @@ ace-pet-vision/
 
 **IntelliJ에서 실제 모델 확인:** 프로젝트 루트(예: `C:\KSW\project_05_pet_detection`)에 GitHub 최신 파일을 반영하고, Python 3.11의 `.venv\Scripts\python.exe`를 Python SDK로 선택합니다. `source/main.py`를 Run 하되 작업 디렉터리를 프로젝트 루트로 설정하세요. 첫 실행에는 인터넷 연결이 필요합니다.
 
-먼저 `run.bat --prepare-models`로 YOLO11n과 ResNet50 가중치 다운로드·해시 검증을 확인할 수 있습니다. 그 다음 `run.bat --input data/images/03_dog_beagle.jpg --limit 1`로 **실제 품종 모델까지** 단일 사진을 테스트하세요. `outputs/pet_counts.csv`, `outputs/pet_breeds.csv`, `outputs/03_dog_beagle_pets.jpg`가 생성되는지 확인합니다. 이상이 없다면 `run.bat --limit 0`으로 20장을 검사합니다. Windows 배치 파일의 `pause`는 정상 동작이며, IntelliJ에서 직접 실행하는 경우에는 추가 인수 없이 기본 20장을 처리합니다.
+먼저 `run.bat --prepare-models`로 YOLO11n, YOLO11s와 ResNet50 가중치 다운로드·해시 검증을 확인할 수 있습니다. 그 다음 `run.bat --input data/images/03_dog_beagle.jpg --limit 1`로 **실제 품종 모델까지** 단일 사진을 테스트하세요. `outputs/pet_counts.csv`, `outputs/pet_breeds.csv`, `outputs/03_dog_beagle_pets.jpg`가 생성되는지 확인합니다. 이상이 없다면 `run.bat --limit 0`으로 20장을 검사합니다. Windows 배치 파일의 `pause`는 정상 동작이며, IntelliJ에서 직접 실행하는 경우에는 추가 인수 없이 기본 20장을 처리합니다.
 
 기본 입력은 `data/images`, 기본 처리 수는 처음 20장입니다. `--limit 0`은 전체입니다.
 사진 한 장: `.\run.bat --input data/images/03_dog_beagle.jpg`.
@@ -56,7 +56,8 @@ ace-pet-vision/
 
 ## 모델
 
-- 탐지: `shared/models/yolo11n.pt`
+- 1차 탐지: `shared/models/yolo11n.pt` (CPU용 경량 모델)
+- 미탐지 재검사: `shared/models/yolo11s.pt` (1차 검출 0개일 때만 실행; 약 19MB 추가 다운로드)
 - 품종: `shared/models/oxford-pets-resnet50.pth`
 
 예전 프로젝트 `models/`에 같은 모델이 있으면 검증 후 새 위치로 복사해 재사용합니다. 기존 파일은 삭제하지 않습니다.
@@ -77,7 +78,9 @@ outputs/
 ```
 
 사진 위쪽에 Dogs/Cats 수, 동물마다 박스·품종 후보·점수를 표시합니다. 점수가 낮거나 종이 불일치하면 보류합니다.
-`pet_counts.csv`에는 사진별 cat/dog 수, 정답과 개수 오차, 처리 상태가 기록됩니다.
+**중복 탐지 보정:** 같은 동물의 전신·얼굴 박스처럼 크게 겹치는 박스는 한 마리로 셉니다. 실제 동물 두 마리가 겹친 사진은 수작업 검증이 필요합니다.
+**미탐지 보완:** YOLO11n이 0마리를 탐지한 사진만 YOLO11s를 입력 크기 960, 신뢰도 0.18로 재검사합니다. 개선을 시도하지만 모든 오탐·미탐이 해결된다는 보장은 없습니다. CPU에서 느리거나 추가 모델 다운로드가 어려우면 `run.bat --no-rescue`로 끌 수 있고 `--rescue-conf 0.25`처럼 기준을 조절할 수 있습니다.
+`pet_counts.csv`에는 사진별 cat/dog 수, 정답과 개수 오차, 처리 상태 및 사용 탐지 모델(`detector`)이 기록됩니다.
 `pet_breeds.csv`에는 동물별 품종 후보가 기록됩니다. 오류는 `errors.log`에서 확인합니다.
 
 같은 이름의 결과는 다시 실행하면 갱신합니다. 이전 결과를 보관하려면 복사하거나 `--output outputs/experiment_02`로 별도 경로를 지정하세요.

@@ -8,13 +8,13 @@ import os
 import cv2
 import numpy as np
 from PIL import Image
-from .pet_model import (MODEL_DIR, YOLO_URL, YOLO_SHA256, BREED_URL, BREED_SHA256,
-                        model_file, BreedClassifier, BREED_CONFIDENCE)
+from .pet_model import (MODEL_DIR, YOLO_URL, YOLO_SHA256, YOLO_S_URL, YOLO_S_SHA256,
+                        BREED_URL, BREED_SHA256, model_file, BreedClassifier, BREED_CONFIDENCE)
 from .visualizer import annotate
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
 COUNT_FIELDS = ["filename", "cat", "dog", "actual_cat", "actual_dog",
-                "cat_error", "dog_error", "status", "error", "result_image"]
+                "cat_error", "dog_error", "status", "detector", "error", "result_image"]
 BREED_FIELDS = ["filename", "object_id", "species", "breed", "candidate_breed",
                 "breed_confidence", "detection_confidence", "status", "reason",
                 "x1", "y1", "x2", "y2"]
@@ -26,6 +26,16 @@ def yolo():
     model = YOLO(str(model_file("yolo11n.pt", YOLO_URL, YOLO_SHA256)))
     if model.names.get(15) != "cat" or model.names.get(16) != "dog":
         raise ValueError("COCO 개·고양이 클래스가 있는 YOLO 모델이 필요합니다.")
+    return model
+
+
+def yolo_rescue():
+    """Extra YOLO11s detector loaded only for images with zero primary detections."""
+    os.environ.setdefault("YOLO_CONFIG_DIR", str(MODEL_DIR / "settings"))
+    from ultralytics import YOLO
+    model = YOLO(str(model_file("yolo11s.pt", YOLO_S_URL, YOLO_S_SHA256)))
+    if model.names.get(15) != "cat" or model.names.get(16) != "dog":
+        raise ValueError("YOLO11s에 COCO cat/dog 클래스가 필요합니다.")
     return model
 
 
@@ -74,6 +84,45 @@ def save_csv(path, fields, rows):
     temporary.replace(path)
 
 
+def _same_animal_box(left, right):
+    """Treat very similar or nested boxes of the same species as a duplicate.
+
+    Mere overlap between different animals is not sufficient; crowded scenes
+    still require manual count validation.
+    """
+    if left["species"] != right["species"]:
+        return False
+    ax1, ay1, ax2, ay2 = (left[k] for k in ("x1", "y1", "x2", "y2"))
+    bx1, by1, bx2, by2 = (right[k] for k in ("x1", "y1", "x2", "y2"))
+    overlap_w = max(0, min(ax2, bx2) - max(ax1, bx1))
+    overlap_h = max(0, min(ay2, by2) - max(ay1, by1))
+    intersection = overlap_w * overlap_h
+    if not intersection:
+        return False
+    area_a = (ax2 - ax1) * (ay2 - ay1)
+    area_b = (bx2 - bx1) * (by2 - by1)
+    if min(area_a, area_b) <= 0:
+        return False
+    iou = intersection / (area_a + area_b - intersection)
+    small_coverage = intersection / min(area_a, area_b)
+    return iou >= 0.55 or (small_coverage >= 0.90 and iou >= 0.25)
+
+
+def deduplicate_pets(predictions):
+    """Keep the most credible breed prediction within each duplicate group."""
+    ranked = sorted(
+        predictions,
+        key=lambda pet: (pet["status"] == "classified", float(pet["breed_confidence"]),
+                         float(pet["detection_confidence"])),
+        reverse=True,
+    )
+    kept = []
+    for candidate in ranked:
+        if not any(_same_animal_box(candidate, earlier) for earlier in kept):
+            kept.append(candidate)
+    return sorted(kept, key=lambda pet: (pet["x1"], pet["y1"], pet["x2"], pet["y2"]))
+
+
 def classify_pets(result, image, classifier):
     """기본 YOLO 결과의 동물 영역을 잘라 추가 품종 모델에 전달합니다."""
     height, width = image.shape[:2]
@@ -90,7 +139,7 @@ def classify_pets(result, image, classifier):
         breed = classifier.classify(crop, species)
         predictions.append({"species": species, "detection_confidence": float(box.conf.item()),
                             "x1": x1, "y1": y1, "x2": x2, "y2": y2, **breed})
-    return sorted(predictions, key=lambda p: (p["x1"], p["y1"], p["x2"], p["y2"]))
+    return deduplicate_pets(predictions)
 
 
 def draw_pets(image, predictions):
