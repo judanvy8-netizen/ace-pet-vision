@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 import shutil
 import urllib.request
+from .fusion import choose_supported_breed
 
 MODEL_DIR = Path(__file__).resolve().parent / "models"
 
@@ -135,7 +136,30 @@ class BreedClassifier:
             return self.classifier(tensor).softmax(dim=1)[0].tolist()
 
     def classify(self, crop, species):
-        return choose_breed(self._probabilities(crop), self.classes, species, self.confidence)
+        return self.classify_with_context(crop, species)
+
+    def classify_with_context(self, crop, species, context=None):
+        primary = self._probabilities(crop)
+        outcome = choose_supported_breed(primary, self.classes, species, self.confidence, CAT_BREEDS)
+        initial_top = outcome["resnet_top_breed"]
+        initial_confidence = outcome["resnet_top_confidence"]
+        outcome["tta_used"] = False
+        # Preserve strong species evidence from original crop, despite background.
+        if outcome["reason"] not in ("low_confidence", "species_conflict"):
+            outcome["initial_top_breed"] = initial_top
+            outcome["initial_top_confidence"] = initial_confidence
+            return outcome
+        from PIL import Image
+        variants = [primary, self._probabilities(crop.transpose(Image.Transpose.FLIP_LEFT_RIGHT))]
+        if context is not None and context.size != crop.size:
+            variants.append(self._probabilities(context))
+        averaged = [sum(sample[i] for sample in variants) / len(variants)
+                    for i in range(len(primary))]
+        outcome = choose_supported_breed(averaged, self.classes, species, self.confidence, CAT_BREEDS)
+        outcome["tta_used"] = True
+        outcome["initial_top_breed"] = initial_top
+        outcome["initial_top_confidence"] = initial_confidence
+        return outcome
 
     def classify_single_pet(self, crop):
         """Breed-only hypothesis for a photo the USER says has exactly one pet.
@@ -146,8 +170,9 @@ class BreedClassifier:
         probabilities = self._probabilities(crop)
         best = max(range(len(self.classes)), key=lambda i: probabilities[i])
         species = "cat" if self.classes[best] in CAT_BREEDS else "dog"
-        outcome = choose_breed(probabilities, self.classes, species, self.confidence)
+        outcome = choose_supported_breed(probabilities, self.classes, species,
+                                         self.confidence, CAT_BREEDS)
         outcome.update(breed="unknown", status="review",
-                       reason="single_pet_assumed_not_yolo_detected")
+                       reason="single_pet_assumed_not_yolo_detected", tta_used=False)
         return {"species": species, **outcome}
 
