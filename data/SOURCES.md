@@ -13,7 +13,7 @@
 |[images/18_cat_siamese.jpg](images/18_cat_siamese.jpg)|siamese|cat|Public domain (PD-self)|[원본 페이지](https://commons.wikimedia.org/wiki/File:Diana_la_gata_Siam%C3%A9s.jpg) · [Licensing](https://commons.wikimedia.org/wiki/File:Diana_la_gata_Siam%C3%A9s.jpg#Licensing)|
 |[images/11_cat_persian.jpg](images/11_cat_persian.jpg)|persian|cat|CC0-1.0|[원본 페이지](https://commons.wikimedia.org/wiki/File:%D0%9F%D0%B5%D1%80%D1%81%D0%B8%D1%81%D0%BA%D0%B0_%D0%BC%D0%B0%D1%87%D0%BA%D0%B0.jpg) · [Licensing](https://commons.wikimedia.org/wiki/File:%D0%9F%D0%B5%D1%80%D1%81%D0%B8%D1%81%D0%BA%D0%B0_%D0%BC%D0%B0%D1%87%D0%BA%D0%B0.jpg#Licensing)|
 |[images/03_dog_beagle.jpg](images/03_dog_beagle.jpg)|beagle|dog|CC0-1.0|[원본 페이지](https://commons.wikimedia.org/wiki/File:Fat_Beagle.jpg) · [Licensing](https://commons.wikimedia.org/wiki/File:Fat_Beagle.jpg#Licensing)|
-|[images/13_dog_pug.jpg](images/13_dog_pug.jpg)|pug|dog|Public domain (PD-self)|[원본 페이지](https://commons.wikimedia.org/wiki/File:Black_13_dog_pug.jpg) · [Licensing](https://commons.wikimedia.org/wiki/File:Black_13_dog_pug.jpg#Licensing)|
+|[images/13_dog_pug.jpg](images/13_dog_pug.jpg)|pug|dog|Public domain (PD-self)|[원본 페이지](https://commons.wikimedia.org/wiki/File:Black_pug.jpg) · [Licensing](https://commons.wikimedia.org/wiki/File:Black_pug.jpg#Licensing)|
 |[images/01_cat_abyssinian.jpg](images/01_cat_abyssinian.jpg)|abyssinian|cat|Public domain (author dedication)|[원본 페이지](https://commons.wikimedia.org/wiki/File:Cinnamon42-300.jpg) · [Licensing](https://commons.wikimedia.org/wiki/File:Cinnamon42-300.jpg#Licensing)|
 |[images/05_cat_birman.png](images/05_cat_birman.png)|birman|cat|CC0-1.0|[원본 페이지](https://commons.wikimedia.org/wiki/File:Birman_Cat.png) · [Licensing](https://commons.wikimedia.org/wiki/File:Birman_Cat.png#Licensing)|
 |[images/10_cat_maine_coon.jpg](images/10_cat_maine_coon.jpg)|maine_coon|cat|CC0-1.0|[원본 페이지](https://commons.wikimedia.org/wiki/File:Alfred_the_Maine_Coon.jpg) · [Licensing](https://commons.wikimedia.org/wiki/File:Alfred_the_Maine_Coon.jpg#Licensing)|
@@ -44,4 +44,4 @@
 
 Cinnamon 품종 보조 근거: [NHGRI 강의 자료 PDF 47쪽, 슬라이드 93](https://www.genome.gov/Pages/Research/IntramuralResearch/DIRCalendar/CurrentTopicsinGenomeAnalysis2006/CourseHandouts/CTGA2006Lec10Grey.pdf#page=47).
 
-검사 결과는 validation-results.json, 수집·검토 기록은 metadata.csv과 REVIEW.md를 참고하세요.
+사진 출처와 수집·검토 기록은 `metadata.csv`에 정리했습니다. 실제 분류·탐지 결과는 로컬 실행 후 `outputs/`에 생성되며 Git에는 포함되지 않습니다.

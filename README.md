@@ -1,6 +1,7 @@
 # ACE — 반려동물 사진 탐지·품종 분류
 
 기본 제공 05번 프로젝트의 **입력 → YOLO 탐지 → 개수 집계 → 저장** 흐름에 품종 분류를 추가했습니다.
+**교사의 추가 지시:** 이번 팀 프로젝트에서는 기본 명세서에 없는 **개·고양이 37품종 분류도 필수 구현 목표**로 삼습니다. 단순 탐지 결과만으로 완성이라고 판단하지 않습니다.
 사진은 기존 `data/images`의 20장을 사용합니다. 대용량 압축파일의 사진은 이번 변경에서 넣지 않았습니다.
 
 ## 구조
@@ -44,6 +45,10 @@ ace-pet-vision/
 .\run.bat
 ```
 
+**IntelliJ에서 실제 모델 확인:** 프로젝트 루트(예: `C:\KSW\project_05_pet_detection`)에 GitHub 최신 파일을 반영하고, Python 3.11의 `.venv\Scripts\python.exe`를 Python SDK로 선택합니다. `source/main.py`를 Run 하되 작업 디렉터리를 프로젝트 루트로 설정하세요. 첫 실행에는 인터넷 연결이 필요합니다.
+
+먼저 `run.bat --prepare-models`로 YOLO11n과 ResNet50 가중치 다운로드·해시 검증을 확인할 수 있습니다. 그 다음 `run.bat --input data/images/03_dog_beagle.jpg --limit 1`로 **실제 품종 모델까지** 단일 사진을 테스트하세요. `outputs/pet_counts.csv`, `outputs/pet_breeds.csv`, `outputs/03_dog_beagle_pets.jpg`가 생성되는지 확인합니다. 이상이 없다면 `run.bat --limit 0`으로 20장을 검사합니다. Windows 배치 파일의 `pause`는 정상 동작이며, IntelliJ에서 직접 실행하는 경우에는 추가 인수 없이 기본 20장을 처리합니다.
+
 기본 입력은 `data/images`, 기본 처리 수는 처음 20장입니다. `--limit 0`은 전체입니다.
 사진 한 장: `.\run.bat --input data/images/03_dog_beagle.jpg`.
 탐지 기준 비교: `.\run.bat --conf 0.5`.
@@ -85,7 +90,7 @@ outputs/
 실행 결과의 `cat_error`, `dog_error`는 |예측 수 − 실제 수|이며 미작성 정답이나 처리 실패에는 계산하지 않습니다.
 `test_cases.csv`에 고양이·개·둘 다·동물 없음·가림·잘못된 입력의 결과를 기록하세요.
 각자 수정 1건, 함수 1개 설명, 실패 사례 3개와 원인 분석을 준비합니다.
-모델의 검출 수·품종은 정답을 보장하지 않습니다. 기존 사진에서도 중복 탐지·미탐이 있으며, 품종 후보 점수는 정확도가 아닙니다.
+모델의 검출 수·품종은 정답을 보장하지 않습니다. 기존 사진에서도 중복 탐지·미탐이 있으며, 품종 후보 점수는 정확도가 아닙니다. **지원하지 않는 품종(예: 골든 리트리버)이나 혼합견도 지원되는 37품종 중 하나로 잘못 출력될 수 있습니다.** 실제 마릿수·품종 정확도는 수작업 검증 전까지 확인되지 않았습니다.
 
 ## 대용량 파일과 출처
 
@@ -97,4 +102,4 @@ outputs/
 - [품종 모델](https://huggingface.co/flaviodell/oxford-pets-resnet50): MIT 표기의 커뮤니티 배포 모델. 버전·검증 해시는 `shared/pet_model.py` 참조.
 - [사진 출처](data/SOURCES.md), [품종·출처 표](data/metadata.csv)
 
-자동 검사: `.venv\Scripts\python.exe -m unittest discover -s tests -v`.
+자동 검사: `.venv\Scripts\python.exe -m unittest discover -s tests -v`. 이 테스트는 모델 호출을 대체하는 단위·통합 흐름 테스트이며 **실제 가중치로 20장을 실행한 결과는 아닙니다.** 반드시 별도로 IntelliJ에서 실제 모델을 실행하고 결과를 확인하세요.

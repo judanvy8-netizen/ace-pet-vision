@@ -64,6 +64,75 @@ class PipelineTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 common.read_ground_truth(path)
 
+    def test_breed_checkpoint_without_optional_num_classes(self):
+        """배포자 문서에 보장되지 않은 num_classes 키는 필수로 요구하지 않습니다."""
+        from unittest.mock import MagicMock
+        from shared.pet_model import BreedClassifier, EXPECTED_CLASSES
+        checkpoint = {"classes": list(EXPECTED_CLASSES), "model_state": {"sentinel": 1}}
+        fake_model = MagicMock()
+        with patch("torch.load", return_value=checkpoint), patch("torchvision.models.resnet50", return_value=fake_model):
+            classifier = BreedClassifier("dummy.pth")
+        self.assertEqual(classifier.classes, EXPECTED_CLASSES)
+        fake_model.load_state_dict.assert_called_once_with(checkpoint["model_state"], strict=True)
+
+    def test_model_startup_failure_does_not_erase_existing_csv(self):
+        from PIL import Image
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, output = root / "images", root / "outputs"
+            source.mkdir(); output.mkdir()
+            Image.new("RGB", (80, 80), "white").save(source / "pet.png")
+            existing = output / "pet_counts.csv"
+            existing.write_bytes(b"previous results must survive\n")
+            with patch.object(app, "SAMPLE_INPUT", source), patch.object(app, "OUTPUT", output), \
+                 patch.object(app, "yolo", side_effect=RuntimeError("YOLO weights unavailable")):
+                with self.assertRaisesRegex(RuntimeError, "unavailable"):
+                    app.main([])
+            self.assertEqual(existing.read_bytes(), b"previous results must survive\n")
+
+    def test_actual_crop_classification_and_csv_integration(self):
+        """YOLO 박스→RGB 크롭→품종 분류→결과 CSV/이미지 경로를 검증합니다."""
+        from unittest.mock import MagicMock
+        from types import SimpleNamespace
+        from PIL import Image
+
+        class Detector:
+            names = {15: "cat", 16: "dog"}
+            def predict(self, image, **kwargs):
+                box = MagicMock()
+                box.cls.item.return_value = 16
+                box.conf.item.return_value = 0.94
+                box.xyxy[0].cpu().tolist.return_value = [10.5, 8.0, 62.5, 47.2]
+                return [SimpleNamespace(names=self.names, boxes=[box])]
+
+        class Classifier:
+            def __init__(self):
+                self.calls = []
+            def classify(self, crop, species):
+                self.calls.append((crop.size, species, crop.getpixel((0, 0))))
+                return pet_model.choose_breed([.92, .08], ["Beagle", "Siamese"], species, .5)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, output = root / "images", root / "outputs"
+            source.mkdir()
+            Image.new("RGB", (90, 70), (30, 60, 200)).save(source / "dog.png")
+            classifier = Classifier()
+            with patch.object(app, "SAMPLE_INPUT", source), patch.object(app, "OUTPUT", output), \
+                 patch.object(app, "yolo", return_value=Detector()), \
+                 patch.object(app, "breed_model", return_value=classifier):
+                self.assertEqual(app.main([]), 0)
+            self.assertEqual(classifier.calls, [((53, 40), "dog", (30, 60, 200))])
+            with (output / "pet_breeds.csv").open(encoding="utf-8-sig", newline="") as handle:
+                breed_rows = list(csv.DictReader(handle))
+            self.assertEqual((breed_rows[0]["species"], breed_rows[0]["breed"], breed_rows[0]["status"]),
+                             ("dog", "Beagle", "classified"))
+            with (output / "pet_counts.csv").open(encoding="utf-8-sig", newline="") as handle:
+                count_rows = list(csv.DictReader(handle))
+            self.assertEqual((count_rows[0]["cat"], count_rows[0]["dog"], count_rows[0]["status"]),
+                             ("0", "1", "ok"))
+            self.assertTrue((output / "dog_pets.jpg").is_file())
+
     def test_default_main_counts_breeds_and_corrupt_image(self):
         from PIL import Image
         class Detector:

@@ -102,8 +102,12 @@ class BreedClassifier:
         from torchvision import models, transforms
         # 임의의 Python 객체를 실행하지 않는 제한된 가중치 로딩을 사용합니다.
         checkpoint = torch.load(weights_path, map_location="cpu", weights_only=True)
-        self.classes = checkpoint["classes"]
-        if tuple(self.classes) != EXPECTED_CLASSES or checkpoint["num_classes"] != 37:
+        # 배포 모델 설명서는 classes와 model_state를 명시하지만
+        # num_classes 메타데이터는 보장하지 않습니다.
+        if not isinstance(checkpoint, dict) or not {"classes", "model_state"}.issubset(checkpoint):
+            raise ValueError("품종 모델 체크포인트에 classes 또는 model_state가 없습니다.")
+        self.classes = tuple(checkpoint["classes"])
+        if self.classes != EXPECTED_CLASSES or checkpoint.get("num_classes", len(self.classes)) != 37:
             raise ValueError("Oxford 37품종 모델의 클래스 정보가 예상과 다릅니다.")
         self.classifier = models.resnet50(weights=None)
         self.classifier.fc = torch.nn.Sequential(torch.nn.Dropout(0.3), torch.nn.Linear(2048, 37))

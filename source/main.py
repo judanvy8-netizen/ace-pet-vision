@@ -51,15 +51,19 @@ def main(argv=None):
     if output == input_root or input_root in output.parents:
         raise ValueError("outputs는 입력 폴더 바깥에 두세요.")
     truth = read_ground_truth((ROOT / args.truth).resolve())
+    print(f"입력: {source} / 처리: {len(files)}장", flush=True)
+    # 필수 기능(개·고양이 탐지 + 37품종 분류)을 먼저 준비합니다.
+    # 모델이 없거나 손상되어 실행에 실패하면 기존 CSV를 지우지 않습니다.
+    model = yolo()
+    classifier = breed_model(args.breed_conf)
+    ids = [i for i, name in model.names.items() if name in TARGETS]
+    if len(ids) != 2:
+        raise ValueError("YOLO 모델에 cat/dog 탐지 클래스가 모두 필요합니다.")
     output.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(filename=output / "errors.log", filemode="w", level=logging.ERROR, encoding="utf-8", force=True)
     rows, breeds, used = [], [], set()
     save_csv(output / "pet_counts.csv", COUNT_FIELDS, rows)
     save_csv(output / "pet_breeds.csv", BREED_FIELDS, breeds)
-    print(f"입력: {source} / 처리: {len(files)}장", flush=True)
-    model = yolo()
-    classifier = breed_model(args.breed_conf)
-    ids = [i for i, name in model.names.items() if name in TARGETS]
     for index, path in enumerate(files, 1):
         filename = path.relative_to(input_root).as_posix()
         row = dict.fromkeys(COUNT_FIELDS, "")
