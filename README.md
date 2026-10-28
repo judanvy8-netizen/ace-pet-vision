@@ -99,6 +99,19 @@ outputs/
 ```
 
 사진 위쪽에 Dogs/Cats 수, 동물마다 박스·품종 후보·점수를 표시합니다. 점수가 낮거나 종이 불일치하면 보류합니다.
+
+### 두 AI 모델의 판단 비교 및 품종·종 오류 수정
+
+YOLO는 **동물 위치와 cat/dog 클래스**, ResNet50은 **37개 품종 확률**을 산출합니다. 기존 구현은 YOLO의 개/고양이 종을 그대로 최종 개수에 사용하여, Sphynx 95%로 분류했는데 Dogs:1로 표기하는 오류가 있었습니다.
+
+현재는 ResNet의 **전체 최고 품종 점수 85% 이상 + 해당 종의 확률 합계 90% 이상**으로 강하게 반박할 때에만 종을 교정합니다. 예: YOLO dog / ResNet Sphynx 95% → Cats:1. 단, 모델 간 충돌은 `review_species`로 기록하며 완전히 검증된 정답이라고 주장하지 않습니다.
+
+반대로 YOLO dog / ResNet 전체 1위 Bengal 33% 같은 불확실한 경우에는 YOLO dog 판단을 유지하고 **개 품종 안에서 가장 높은 후보**를 보여줍니다. 품종 확률을 종별로 재정규화해 점수를 부풀리지 않습니다. 저신뢰·종 충돌 사진만 좌우반전 및 주변 영역을 추가 평가합니다.
+
+이제 `outputs/pet_breeds.csv`에서 `yolo_label`(YOLO 원래 클래스), `detection_confidence`, `resnet_top_breed`, `resnet_top_confidence`, `resnet_species`, `resnet_species_mass`, `top3_global`, `top3_species`, `tta_used`, `reason`, `species`(최종 종류)를 **같은 행에서 비교**할 수 있습니다. 별도 실행 명령이나 결과 폴더는 필요 없습니다.
+
+**검증 주의:** 사진 04의 Bengal 약 50% REVIEW는 실제 점수가 50% 미만인데 화면이 정수 반올림했을 수 있습니다. 이제 리뷰 점수는 소수 첫째 자리까지 표시합니다. 16 Samoyed의 YOLO 다른 동물 분류는 `review_detection`으로 기록하고 원래 라벨도 CSV에 표시합니다. 실제 사진의 수정 성공 여부는 IntelliJ에서 재실행해 확인해야 합니다.
+
 **중복 탐지 보정:** 같은 동물의 전신·얼굴 박스처럼 크게 겹치는 박스는 한 마리로 셉니다. 실제 동물 두 마리가 겹친 사진은 수작업 검증이 필요합니다.
 **미탐지 보완:** YOLO11n이 0마리인 사진만 YOLO11s·고해상도 TTA·YOLO11m 확대 검사 순서로 자동 재검사합니다. 기본 `main.py` 실행만으로 동작하며 새 결과 폴더는 만들지 않습니다. 실제 검출 개선은 사진별로 확인해야 하고, 실패 시 결과를 임의로 1마리로 바꾸지 않습니다.
 `pet_counts.csv`에는 사진별 cat/dog 수, 정답과 개수 오차, 처리 상태 및 사용 탐지 모델(`detector`)이 기록됩니다. 사진 출처는 **`source_url` 열**에 나타나며 `data/metadata.csv`의 `source_page` 주소를 가져옵니다. 출처가 없는 사진은 빈칸으로 표시합니다.
