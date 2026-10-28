@@ -22,7 +22,7 @@ BREED_FIELDS = ["filename", "object_id", "species", "breed", "candidate_breed",
                 "resnet_top_breed", "resnet_top_confidence", "resnet_species",
                 "resnet_species_mass", "yolo_species_mass", "tta_used",
                 "initial_top_breed", "initial_top_confidence", "top3_global",
-                "top3_species"]
+                "top3_species", "variant_diagnostics"]
 
 
 def yolo():

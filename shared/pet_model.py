@@ -138,27 +138,48 @@ class BreedClassifier:
     def classify(self, crop, species):
         return self.classify_with_context(crop, species)
 
+    @staticmethod
+    def _aspect_preserved_view(crop):
+        """가로·세로가 긴 동물 사진을 정사각형으로 찌그러뜨리지 않고 채웁니다."""
+        from PIL import Image, ImageOps
+        # 사진 평균 색상으로 여백을 채워 인위적인 검은 테두리를 피합니다.
+        fill = crop.convert("RGB").resize((1, 1)).getpixel((0, 0))
+        return ImageOps.pad(crop.convert("RGB"), (224, 224),
+                            method=Image.Resampling.BILINEAR, color=fill)
+
     def classify_with_context(self, crop, species, context=None):
         primary = self._probabilities(crop)
         outcome = choose_supported_breed(primary, self.classes, species, self.confidence, CAT_BREEDS)
         initial_top = outcome["resnet_top_breed"]
         initial_confidence = outcome["resnet_top_confidence"]
         outcome["tta_used"] = False
-        # Preserve strong species evidence from original crop, despite background.
+        outcome["variant_diagnostics"] = f"원본:{initial_top} {initial_confidence:.1%}"
+        # 기존에 높은 신뢰도로 판단된 결과(16/19번 포함)는 훼손하지 않습니다.
         if outcome["reason"] not in ("low_confidence", "species_conflict"):
             outcome["initial_top_breed"] = initial_top
             outcome["initial_top_confidence"] = initial_confidence
             return outcome
+
         from PIL import Image
-        variants = [primary, self._probabilities(crop.transpose(Image.Transpose.FLIP_LEFT_RIGHT))]
+        variants = [("원본", primary),
+                    ("좌우반전", self._probabilities(crop.transpose(Image.Transpose.FLIP_LEFT_RIGHT)))]
         if context is not None and context.size != crop.size:
-            variants.append(self._probabilities(context))
-        averaged = [sum(sample[i] for sample in variants) / len(variants)
+            variants.append(("주변영역", self._probabilities(context)))
+        # 근접·가로 사진(예: 500x231 치와와)을 224x224로 왜곡하지 않는 관점도 검사합니다.
+        if min(crop.size) and max(crop.size) / min(crop.size) >= 1.4:
+            variants.append(("비율유지", self._probabilities(self._aspect_preserved_view(crop))))
+
+        averaged = [sum(probs[i] for _, probs in variants) / len(variants)
                     for i in range(len(primary))]
         outcome = choose_supported_breed(averaged, self.classes, species, self.confidence, CAT_BREEDS)
-        outcome["tta_used"] = True
+        outcome["tta_used"] = len(variants) > 1
         outcome["initial_top_breed"] = initial_top
         outcome["initial_top_confidence"] = initial_confidence
+        def variant_summary(name, probs):
+            idx = max(range(len(probs)), key=lambda i: probs[i])
+            return f"{name}:{self.classes[idx]} {probs[idx]:.1%}"
+        outcome["variant_diagnostics"] = " | ".join(
+            variant_summary(name, probs) for name, probs in variants)
         return outcome
 
     def classify_single_pet(self, crop):

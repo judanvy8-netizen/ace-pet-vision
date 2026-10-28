@@ -84,6 +84,40 @@ class FusionTests(unittest.TestCase):
         self.assertEqual(uncertain["species"], "dog")
         self.assertEqual(uncertain["initial_top_breed"], "Bengal")
 
+    def test_wide_chihuahua_photo_uses_ratio_preserving_variant(self):
+        """500x231 같은 사진은 비율을 유지한 추가 관점으로도 검사합니다."""
+        obj = object.__new__(BreedClassifier)
+        obj.classes = tuple(CLASSES)
+        obj.confidence = .5
+        visited = []
+        samples = iter([[.35, .30, .20, .15], [.32, .37, .17, .14],
+                        [.18, .61, .13, .08]])
+        def infer(photo):
+            visited.append(photo.size)
+            return next(samples)
+        obj._probabilities = infer
+        result = obj.classify_with_context(Image.new("RGB", (500, 231), "white"), "dog")
+        self.assertEqual(visited, [(500, 231), (500, 231), (224, 224)])
+        self.assertTrue(result["tta_used"])
+        self.assertEqual(result["species"], "dog")
+        self.assertIn("비율유지:Chihuahua", result["variant_diagnostics"])
+        self.assertEqual(result["initial_top_breed"], "Bengal")
+
+    def test_strong_sphynx_correction_does_not_invoke_extra_views(self):
+        """95% 스핑크스처럼 강한 교정 근거는 불필요한 증강으로 희석하지 않습니다."""
+        obj = object.__new__(BreedClassifier)
+        obj.classes = tuple(CLASSES)
+        obj.confidence = .5
+        visited = []
+        def infer(photo):
+            visited.append(photo.size)
+            return [.01, .02, .95, .02]
+        obj._probabilities = infer
+        result = obj.classify_with_context(Image.new("RGB", (500, 200), "white"), "dog")
+        self.assertEqual(result["species"], "cat")
+        self.assertEqual(result["reason"], "species_corrected_high_confidence")
+        self.assertEqual(visited, [(500, 200)])
+
     def test_full_main_writes_both_model_opinions_and_corrected_cat_count(self):
         box = MagicMock()
         box.cls.item.return_value = 16
