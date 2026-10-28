@@ -109,3 +109,10 @@ git pull --ff-only
 - 마지막 YOLO11m 탐지 단계에 한해 **클래스 사전 필터를 해제**하고 실제로 검출된 다른 동물 박스(곰·양·말·소)가 있으면 ResNet50 37품종 분류와 교차 확인. 낮은 분류 점수는 버리고, 선택되더라도 `review_detection` 표시와 품종 후보만 기록. 마릿수 정확도 계산에서 제외.
 - 확대 크롭 탐지에도 같은 원칙을 적용. 기본 `main.py` 실행 흐름과 기존 `outputs` 경로 유지.
 - **검증 한계:** 모의 YOLO 박스와 분류기 테스트는 수행 가능하지만, 16번 원본 사진의 실제 YOLO11m 전체 클래스 출력은 현재 실행 환경에서 확인하지 못함. 검출 성공을 단정하지 않으며 재검사 결과로 확인해야 함.
+
+### 후속 수정: 원인 판별용 실행 로그 보완
+
+- [교차 검토 코드](https://github.com/judanvy8-netizen/ace-pet-vision/commit/c2b817926ef33be1ea8564293efe1e1c3e262096): 마지막 YOLO11m 단계에서 COCO 클래스 필터를 해제하고, 실제 다른 동물 클래스 박스를 37품종 모델로 검토합니다. 허용된 클래스는 bear/sheep/cow/horse이며 품종 점수 0.55 미만이면 채택하지 않습니다.
+- [로그 개선](https://github.com/judanvy8-netizen/ace-pet-vision/commit/f08195d86e7aa63e78642588f609d641a35afb06): 여전히 0마리면 `outputs/errors.log`에 YOLO11m 원래 예측한 클래스와 점수를 기록합니다. YOLO11m 가중치 다운로드·실행 실패는 터미널에도 경고를 표시하고 CSV의 `status=partial_error`로 구분합니다.
+- **유의:** `review_detection`은 실제 YOLO 박스는 있으나 개/고양이 종을 다른 품종 모델로 재추정한 검토 대상 결과입니다. 정답으로 간주하거나 정확도 계산에 포함하지 않습니다.
+- 사용자는 `source/main.py`를 기본 Run 한 뒤 `outputs/pet_counts.csv`에서 16번의 `status`/`detector`를, 미검출 시 `outputs/errors.log`의 16번 관련 줄을 확인합니다. 추가 `check_16` 폴더는 필요하지 않습니다.
