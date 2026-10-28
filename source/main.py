@@ -191,8 +191,9 @@ def main(argv=None):
     try:
         stats = write_evaluation(rows, breeds, truth, (ROOT / args.metadata).resolve(), output)
         print(f"검증: 수작업 정답 {stats['truth_confirmed']}/{stats['processed']}장 / "
-              f"일반 탐지 개수 일치 {stats['count_exact']}/{stats['count_scored']}장 "
-              "(REVIEW 제외)", flush=True)
+              f"정상 탐지 개수 일치 {stats['count_exact']}/{stats['count_scored']}장 "
+              f"(REVIEW 제외) / 최종 교차 판정 개수 일치 "
+              f"{stats['final_count_exact']}/{stats['final_count_scored']}장", flush=True)
     except (OSError, ValueError) as error:
         logging.exception("검증 요약 파일 생성 실패")
         print(f"[경고] 검증 요약 생성 실패: {error}", flush=True)
