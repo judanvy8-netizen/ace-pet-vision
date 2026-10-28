@@ -11,6 +11,7 @@ from shared.common import (yolo, image_files, read_image, save_image, save_csv,
                            read_ground_truth, read_photo_sources, single_pet_review,
                            COUNT_FIELDS, BREED_FIELDS)
 from shared.pet_model import prepare_models
+from shared.evaluation import write_evaluation
 
 TARGETS = ("cat", "dog")
 SAMPLE_INPUT = ROOT / "data" / "images"
@@ -187,6 +188,14 @@ def main(argv=None):
         rows.append(row)
         save_csv(output / "pet_counts.csv", COUNT_FIELDS, rows)
         save_csv(output / "pet_breeds.csv", BREED_FIELDS, breeds)
+    try:
+        stats = write_evaluation(rows, breeds, truth, (ROOT / args.metadata).resolve(), output)
+        print(f"검증: 수작업 정답 {stats['truth_confirmed']}/{stats['processed']}장 / "
+              f"일반 탐지 개수 일치 {stats['count_exact']}/{stats['count_scored']}장 "
+              "(REVIEW 제외)", flush=True)
+    except (OSError, ValueError) as error:
+        logging.exception("검증 요약 파일 생성 실패")
+        print(f"[경고] 검증 요약 생성 실패: {error}", flush=True)
     print(f"결과: {output}")
     return int(any(row["status"] in ("error", "partial_error") for row in rows))
 

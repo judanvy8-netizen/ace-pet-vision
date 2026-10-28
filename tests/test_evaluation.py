@@ -1,0 +1,67 @@
+import csv
+import tempfile
+import unittest
+from pathlib import Path
+from shared.evaluation import summarize_evaluation, write_evaluation
+
+
+class EvaluationTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.metadata = self.root / "metadata.csv"
+        self.metadata.write_text(
+            "filename,label,species,source_page\n"
+            "cat.jpg,sphynx,cat,https://commons.wikimedia.org/test\n"
+            "dog.jpg,chihuahua,dog,https://commons.wikimedia.org/test2\n"
+            "miss.jpg,samoyed,dog,https://commons.wikimedia.org/test3\n",
+            encoding="utf-8-sig",
+        )
+
+    def test_blank_truth_does_not_become_zero(self):
+        counts = [dict(filename="cat.jpg", cat=0, dog=0, status="no_detection", detector="yolo11m")]
+        detail, stats = summarize_evaluation(
+            counts, [], {"cat.jpg": {"actual_cat": None, "actual_dog": None}}, self.metadata)
+        self.assertEqual(detail[0]["count_check"], "수작업 정답 미작성")
+        self.assertEqual(stats["count_scored"], 0)
+
+    def test_review_is_excluded_from_strict_accuracy(self):
+        counts = [dict(filename="cat.jpg", cat=1, dog=0, status="review_species", detector="yolo11n")]
+        breeds = [dict(filename="cat.jpg", species="cat", candidate_breed="Sphynx",
+                       resnet_top_breed="Sphynx", reason="species_corrected_high_confidence")]
+        truth = {"cat.jpg": {"actual_cat": 1, "actual_dog": 0}}
+        detail, stats = summarize_evaluation(counts, breeds, truth, self.metadata)
+        self.assertEqual(detail[0]["count_check"], "모델 판단 충돌(평가 제외)")
+        self.assertEqual(stats["count_scored"], 0)
+        self.assertEqual(stats["source_candidate_match"], 1)
+
+    def test_count_error_and_source_label_agreement_are_separate(self):
+        counts = [
+            dict(filename="dog.jpg", cat=0, dog=1, status="ok", detector="yolo11n"),
+            dict(filename="miss.jpg", cat=0, dog=0, status="no_detection", detector="yolo11m"),
+        ]
+        breeds = [dict(filename="dog.jpg", species="dog", candidate_breed="Chihuahua",
+                       resnet_top_breed="Bengal")]
+        truth = {"dog.jpg": {"actual_cat": 0, "actual_dog": 1},
+                 "miss.jpg": {"actual_cat": 0, "actual_dog": 1}}
+        detail, stats = summarize_evaluation(counts, breeds, truth, self.metadata)
+        self.assertEqual(stats["count_scored"], 2)
+        self.assertEqual(stats["count_exact"], 1)
+        self.assertEqual(detail[0]["candidate_vs_source"], "출처 표기 일치")
+        self.assertEqual(detail[0]["global_top_vs_source"], "출처 표기 불일치")
+        self.assertEqual(detail[1]["count_absolute_error"], 1)
+
+    def test_report_created_without_fabricated_accuracy(self):
+        count = [dict(filename="cat.jpg", cat=1, dog=0, status="ok", detector="yolo11n")]
+        stat = write_evaluation(count, [], {}, self.metadata, self.root / "outputs")
+        self.assertEqual(stat["count_scored"], 0)
+        with (self.root / "outputs" / "검증_상세.csv").open(encoding="utf-8-sig") as handle:
+            self.assertEqual(len(list(csv.DictReader(handle))), 1)
+        summary = (self.root / "outputs" / "검증_요약.md").read_text(encoding="utf-8")
+        self.assertIn("계산 보류", summary)
+        self.assertNotIn("100.0%", summary)
+
+
+if __name__ == "__main__":
+    unittest.main()
