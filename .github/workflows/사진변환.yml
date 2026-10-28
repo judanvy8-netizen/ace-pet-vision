@@ -5,6 +5,7 @@ on:
       - "data/images/img_005.png"
       - "data/images/img_007.png"
       - "tools/사진변환.py"
+      - ".github/workflows/사진변환.yml"
   workflow_dispatch:
 permissions:
   contents: write
